@@ -183,7 +183,6 @@ class KATEPART_TESTS_EXPORT KateCompletionModel : public ExpandingWidgetModel
     void expandIndex(const QModelIndex& index);
     //Emitted whenever something has changed about the group of argument-hints
     void argumentHintsChanged();
-    void contentGeometryChanged();
 
   public Q_SLOTS:
     void setSortingEnabled(bool enable);
@@ -319,7 +318,8 @@ class KATEPART_TESTS_EXPORT KateCompletionModel : public ExpandingWidgetModel
     ///i must be an index in the source model
     QSet<Group*> deleteItems(const QModelIndex& i);
     Group* createItem(const HierarchicalModelHandler&, const QModelIndex& i, bool notifyModel = false);
-    void clearGroups(bool reset = true);
+    /// @note Make sure you're in a {begin,end}ResetModel block when calling this!
+    void clearGroups();
     void hideOrShowGroup(Group* g, bool notifyModel = true);
     /// When forceGrouping is enabled, all given attributes will be used for grouping, regardless of the completion settings.
     Group* fetchGroup(int attribute, const QString& scope = QString(), bool forceGrouping = false);
@@ -336,7 +336,7 @@ class KATEPART_TESTS_EXPORT KateCompletionModel : public ExpandingWidgetModel
     };
 
     //Returns whether the model needs to be reset
-    bool changeCompletions(Group* g, changeTypes changeType);
+    void changeCompletions(KateCompletionModel::Group* g, changeTypes changeType, bool notifyModel);
 
     bool hasCompletionModel() const;
 

@@ -504,7 +504,7 @@ QModelIndex KateCompletionModel::indexForGroup( Group * g ) const
   return createIndex(row, 0, 0);
 }
 
-void KateCompletionModel::clearGroups( bool shouldReset )
+void KateCompletionModel::clearGroups()
 {
   clearExpanding();
   m_ungrouped->clear();
@@ -536,9 +536,6 @@ void KateCompletionModel::clearGroups( bool shouldReset )
 
   m_emptyGroups.append(m_bestMatches);
   m_groupHash.insert(BestMatchesProperty, m_bestMatches);
-
-  if(shouldReset)
-    reset();
 }
 
 QSet<KateCompletionModel::Group*> KateCompletionModel::createItems(const HierarchicalModelHandler& _handler, const QModelIndex& i, bool notifyModel) {
@@ -577,9 +574,10 @@ QSet<KateCompletionModel::Group*> KateCompletionModel::deleteItems(const QModelI
 
 void KateCompletionModel::createGroups()
 {
+  beginResetModel();
   //After clearing the model, it has to be reset, else we will be in an invalid state while inserting
   //new groups.
-  clearGroups(true);
+  clearGroups();
 
   bool has_groups=false;
   foreach (CodeCompletionModel* sourceModel, m_completionModels) {
@@ -600,10 +598,7 @@ void KateCompletionModel::createGroups()
   makeGroupItemsUnique();
   
   updateBestMatches();
-  
-  reset();
-
-  emit contentGeometryChanged();
+  endResetModel();
 }
 
 KateCompletionModel::Group* KateCompletionModel::createItem(const HierarchicalModelHandler& handler, const QModelIndex& sourceIndex, bool notifyModel)
@@ -661,8 +656,6 @@ void KateCompletionModel::slotRowsInserted( const QModelIndex & parent, int star
 
   foreach (Group* g, affectedGroups)
       hideOrShowGroup(g);
-
-    emit contentGeometryChanged();
 }
 
 void KateCompletionModel::slotRowsRemoved( const QModelIndex & parent, int start, int end )
@@ -679,8 +672,6 @@ void KateCompletionModel::slotRowsRemoved( const QModelIndex & parent, int start
 
   foreach (Group* g, affectedGroups)
     hideOrShowGroup(g);
-
-  emit contentGeometryChanged();
 }
 
 KateCompletionModel::Group* KateCompletionModel::fetchGroup( int attribute, const QString& scope, bool forceGrouping )
@@ -938,31 +929,32 @@ void KateCompletionModel::setCurrentCompletion( KTextEditor::CodeCompletionModel
 
   m_currentMatch[model] = completion;
 
-  bool needsReset = false;
+  const bool resetModel = (changeType != Narrow);
+  if (resetModel) {
+    beginResetModel();
+  }
   
   if (!hasGroups()) {
-    needsReset |= changeCompletions(m_ungrouped, changeType);
+    changeCompletions(m_ungrouped, changeType, !resetModel);
   } else {
     foreach (Group* g, m_rowTable) {
       if(g != m_argumentHints)
-        needsReset |= changeCompletions(g, changeType);
+        changeCompletions(g, changeType, !resetModel);
     }
     foreach (Group* g, m_emptyGroups) {
       if(g != m_argumentHints)
-        needsReset |= changeCompletions(g, changeType);
+        changeCompletions(g, changeType, !resetModel);
     }
+  }
+
+  if (resetModel) {
+    endResetModel();
   }
 
   // NOTE: best matches are also updated in resort
   resort();
 
-  kDebug()<<"needsReset"<<needsReset;
-  if(needsReset)
-    reset();
-
   clearExpanding(); //We need to do this, or be aware of expanding-widgets while filtering.
-  emit contentGeometryChanged();
-  kDebug();
 }
 
 QString KateCompletionModel::commonPrefixInternal(const QString &forcePrefix) const
@@ -1024,15 +1016,14 @@ QString KateCompletionModel::commonPrefix(QModelIndex selectedIndex) const
   return commonPrefix;
 }
 
-bool KateCompletionModel::changeCompletions( Group * g, changeTypes changeType )
+void KateCompletionModel::changeCompletions( Group * g, changeTypes changeType, bool notifyModel )
 {
-  bool notifyModel = true;
   if(changeType != Narrow) {
-    notifyModel = false;
     g->filtered = g->prefilter;
     //In the "Broaden" or "Change" case, just re-filter everything,
     //and don't notify the model. The model is notified afterwards through a reset().
   }
+
   //This code determines what of the filtered items still fit, and computes the ranges that were removed, giving
   //them to beginRemoveRows(..) in batches
   
@@ -1054,14 +1045,13 @@ bool KateCompletionModel::changeCompletions( Group * g, changeTypes changeType )
     }
   }
   
-  if(deleteUntil != -1) {
+  if(deleteUntil != -1 && notifyModel) {
     beginRemoveRows(indexForGroup(g), 0, deleteUntil);
     endRemoveRows();
   }
   
   g->filtered = newFiltered;
   hideOrShowGroup(g, notifyModel);
-  return !notifyModel;
 }
 
 int KateCompletionModel::Group::orderNumber() const {
@@ -1256,8 +1246,9 @@ const QList< QList < int > > & KateCompletionModel::columnMerges( ) const
 
 void KateCompletionModel::setColumnMerges( const QList< QList < int > > & columnMerges )
 {
+  beginResetModel();
   m_columnMerges = columnMerges;
-  reset();
+  endResetModel();
 }
 
 int KateCompletionModel::translateColumn( int sourceColumn ) const
@@ -1575,8 +1566,10 @@ void KateCompletionModel::setSortingCaseSensitivity( Qt::CaseSensitivity cs )
   }
 }
 
-void KateCompletionModel::resort( )
+void KateCompletionModel::resort()
 {
+  beginResetModel();
+
   foreach (Group* g, m_rowTable)
     g->resort();
 
@@ -1585,7 +1578,7 @@ void KateCompletionModel::resort( )
 
   // call updateBestMatches here, so they are moved to the top again.
   updateBestMatches();
-  emit contentGeometryChanged();
+  endResetModel();
 }
 
 bool KateCompletionModel::Item::isValid( ) const
@@ -1654,6 +1647,7 @@ void KateCompletionModel::setMaximumInheritanceDepth( int maxDepth )
 
 void KateCompletionModel::refilter( )
 {
+  beginResetModel();
   m_ungrouped->refilter();
 
   foreach (Group* g, m_rowTable)
@@ -1667,6 +1661,7 @@ void KateCompletionModel::refilter( )
   updateBestMatches();
 
   clearExpanding(); //We need to do this, or be aware of expanding-widgets while filtering.
+  endResetModel();
 }
 
 void KateCompletionModel::Group::refilter( )
@@ -2048,20 +2043,19 @@ void KateCompletionModel::removeCompletionModel(CodeCompletionModel * model)
   if (!model || !m_completionModels.contains(model))
     return;
 
+  beginResetModel();
   m_currentMatch.remove(model);
 
-  clearGroups(false);
+  clearGroups();
 
   model->disconnect(this);
 
   m_completionModels.removeAll(model);
+  endResetModel();
 
   if (!m_completionModels.isEmpty()) {
     // This performs the reset
     createGroups();
-  }else{
-    emit contentGeometryChanged();
-    reset();
   }
 }
 
@@ -2252,6 +2246,10 @@ void KateCompletionModel::rowSelected(const QModelIndex& row) {
 
 void KateCompletionModel::clearCompletionModels()
 {
+  if (m_completionModels.isEmpty())
+    return;
+
+  beginResetModel();
   foreach (CodeCompletionModel * model, m_completionModels)
     model->disconnect(this);
 
@@ -2260,6 +2258,7 @@ void KateCompletionModel::clearCompletionModels()
   m_currentMatch.clear();
 
   clearGroups();
+  endResetModel();
 }
 
 #include "katecompletionmodel.moc"
