@@ -9,7 +9,7 @@ set(katebuild_SRCS
     SelectTargetView.cpp
 )
 
-ki18n_wrap_ui(katebuild_SRCS build.ui SelectTargetUi.ui)
+ki18n_wrap_ui(katebuild_SRCS build.ui SelectTargetUi.ui TargetsUi.ui)
 
 # resource for ui file and stuff
 qt5_add_resources(katebuild_SRCS plugin.qrc)

@@ -20,33 +20,25 @@
 #ifndef TARGETS_H
 #define TARGETS_H
 
+#include <QWidget>
+#include "ui_TargetsUi.h"
+
 #include <QGridLayout>
 #include <QToolButton>
 #include <QTreeView>
 #include <QComboBox>
 #include <QLabel>
-#include <QWidget>
 #include "TargetHtmlDelegate.h"
 #include "TargetModel.h"
 
-class TargetsUi: public QWidget
+class TargetsUi: public QWidget, public Ui::TargetsUi
 {
     Q_OBJECT
 
 public:
     TargetsUi(QObject *view, QWidget *parent = 0);
 
-    QLabel      *targetLabel;
-    QComboBox   *targetCombo;
-    QToolButton *newTarget;
-    QToolButton *copyTarget;
-    QToolButton *deleteTarget;
-
-    QTreeView   *targetsView;
     TargetModel  targetsModel;
-
-    QToolButton *addButton;
-    QToolButton *buildButton;
 
 
 public Q_SLOTS:
