@@ -50,6 +50,7 @@ find_package(KF5 "${KF5_DEP_VERSION}" REQUIRED COMPONENTS
   WindowSystem
   XmlGui
   IconThemes
+  ItemModels
 )
 
 # some optional deps, to make compiling on some OSes easier

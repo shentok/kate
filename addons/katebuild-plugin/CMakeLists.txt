@@ -16,7 +16,7 @@ qt5_add_resources(katebuild_SRCS plugin.qrc)
 
 add_library(katebuildplugin MODULE ${katebuild_SRCS})
 kcoreaddons_desktop_to_json (katebuildplugin katebuildplugin.desktop)
-target_link_libraries(katebuildplugin KF5::TextEditor KF5::I18n KF5::IconThemes)
+target_link_libraries(katebuildplugin KF5::TextEditor KF5::I18n KF5::IconThemes KF5::ItemModels)
 
 install(TARGETS katebuildplugin DESTINATION ${PLUGIN_INSTALL_DIR}/ktexteditor)
 

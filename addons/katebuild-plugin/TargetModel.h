@@ -23,6 +23,10 @@
 #define TargetModel_h
 
 #include <QAbstractItemModel>
+
+#include <kdescendantsproxymodel.h>
+#include <KRecursiveFilterProxyModel>
+
 #include <QByteArray>
 
 class TargetModel : public QAbstractItemModel
@@ -98,6 +102,33 @@ public:
 private:
 
     QList<TargetSet> m_targets;
+};
+
+class ProxyModel : public QAbstractProxyModel
+{
+public:
+    ProxyModel(QObject *parent = 0);
+
+    void setSourceModel(QAbstractItemModel *sourceModel) Q_DECL_OVERRIDE;
+
+    QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
+    QModelIndex parent(const QModelIndex &child) const Q_DECL_OVERRIDE;
+    int rowCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
+    int columnCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
+
+    QModelIndex mapToSource(const QModelIndex &proxyIndex) const Q_DECL_OVERRIDE;
+    QModelIndex mapFromSource(const QModelIndex &sourceIndex) const Q_DECL_OVERRIDE;
+
+private:
+    class FilterProxyModel : public KRecursiveFilterProxyModel
+    {
+    public:
+        FilterProxyModel(QObject *parent = 0);
+        bool filterAcceptsRow(int source_row, const QModelIndex &source_parent) const Q_DECL_OVERRIDE;
+    };
+
+    KDescendantsProxyModel m_outerProxyModel;
+    FilterProxyModel m_innerProxyModel;
 };
 
 #endif

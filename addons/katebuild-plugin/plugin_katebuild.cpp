@@ -32,6 +32,7 @@
 #include <QRegExp>
 #include <QString>
 #include <QScrollBar>
+#include <QComboBox>
 #include <QCompleter>
 #include <QDirModel>
 #include <QKeyEvent>
@@ -75,7 +76,6 @@ KateBuildView::KateBuildView(KTextEditor::Plugin *plugin, KTextEditor::MainWindo
     : QObject (mw)
     , m_win(mw)
     , m_buildWidget(0)
-    , m_outputWidgetWidth(0)
     , m_proc(this)
     , m_stdOut()
     , m_stdErr()
@@ -102,14 +102,6 @@ KateBuildView::KateBuildView(KTextEditor::Plugin *plugin, KTextEditor::MainWindo
     a->setIcon(QIcon::fromTheme(QStringLiteral("select")));
     connect(a, SIGNAL(triggered(bool)), this, SLOT(slotSelectTarget()));
 
-    a = actionCollection()->addAction(QStringLiteral("build_default_target"));
-    a->setText(i18n("Build Default Target"));
-    connect(a, SIGNAL(triggered(bool)), this, SLOT(slotBuildDefaultTarget()));
-
-    a = actionCollection()->addAction(QStringLiteral("build_previous_target"));
-    a->setText(i18n("Build Previous Target"));
-    connect(a, SIGNAL(triggered(bool)), this, SLOT(slotBuildPreviousTarget()));
-
     a = actionCollection()->addAction(QStringLiteral("stop"));
     a->setText(i18n("Stop"));
     a->setIcon(QIcon::fromTheme(QStringLiteral("edit-delete")));
@@ -130,23 +122,13 @@ KateBuildView::KateBuildView(KTextEditor::Plugin *plugin, KTextEditor::MainWindo
 
     m_buildWidget = new QWidget(m_toolView);
     m_buildUi.setupUi(m_buildWidget);
-    m_targetsUi = new TargetsUi(this, m_buildUi.u_tabWidget);
-    m_buildUi.u_tabWidget->insertTab(0, m_targetsUi, i18nc("Tab label", "Target Settings"));
-    m_buildUi.u_tabWidget->setCurrentWidget(m_targetsUi);
+
+    m_proxyModel.setSourceModel(&m_targetsModel);
+    m_buildUi.targetCombo->setModel(&m_proxyModel);
 
     m_buildWidget->installEventFilter(this);
 
-    m_targetsUi->setModel(&m_targetsModel);
-
-    m_buildUi.buildAgainButton->setVisible(true);
-    m_buildUi.cancelBuildButton->setVisible(true);
-    m_buildUi.buildStatusLabel->setVisible(true);
-    m_buildUi.buildAgainButton2->setVisible(false);
-    m_buildUi.cancelBuildButton2->setVisible(false);
-    m_buildUi.buildStatusLabel2->setVisible(false);
-    m_buildUi.extraLineLayout->setAlignment(Qt::AlignRight);
     m_buildUi.cancelBuildButton->setEnabled(false);
-    m_buildUi.cancelBuildButton2->setEnabled(false);
 
     connect(m_buildUi.errTreeWidget, SIGNAL(itemClicked(QTreeWidgetItem*,int)),
             SLOT(slotErrorSelected(QTreeWidgetItem*)));
@@ -156,13 +138,12 @@ KateBuildView::KateBuildView(KTextEditor::Plugin *plugin, KTextEditor::MainWindo
 
     connect(m_buildUi.displayModeSlider, SIGNAL(valueChanged(int)), this, SLOT(slotDisplayMode(int)));
 
-    connect(m_buildUi.buildAgainButton, SIGNAL(clicked()), this, SLOT(slotBuildPreviousTarget()));
     connect(m_buildUi.cancelBuildButton, SIGNAL(clicked()), this, SLOT(slotStop()));
-    connect(m_buildUi.buildAgainButton2, SIGNAL(clicked()), this, SLOT(slotBuildPreviousTarget()));
-    connect(m_buildUi.cancelBuildButton2, SIGNAL(clicked()), this, SLOT(slotStop()));
 
-    connect(m_targetsUi->buildButton, SIGNAL(clicked()), this, SLOT(slotBuildActiveTarget()));
-    connect(m_targetsUi, SIGNAL(enterPressed()), this, SLOT(slotBuildActiveTarget()));
+    connect(m_buildUi.buildButton, SIGNAL(clicked()), this, SLOT(slotBuildActiveTarget()));
+    connect(this, SIGNAL(enterPressed()), this, SLOT(slotBuildActiveTarget()));
+
+    connect(m_buildUi.configureButton, SIGNAL(clicked()), this, SLOT(slotSelectTarget()));
 
     m_proc.setOutputChannelMode(KProcess::SeparateChannels);
     connect(&m_proc, SIGNAL(finished(int,QProcess::ExitStatus)), this, SLOT(slotProcExited(int,QProcess::ExitStatus)));
@@ -206,7 +187,6 @@ void KateBuildView::readSessionConfig(const KConfigGroup& cg)
 {
     int numTargets = cg.readEntry(QStringLiteral("NumTargets"), 0);
     m_targetsModel.clear();
-    int tmpIndex;
     int tmpCmd;
 
     if (numTargets == 0 ) {
@@ -220,7 +200,6 @@ void KateBuildView::readSessionConfig(const KConfigGroup& cg)
         if (!quickCmd.isEmpty()) {
             m_targetsModel.addCommand(0, i18n("quick"), quickCmd);
         }
-        tmpIndex = 0;
         tmpCmd = 0;
     }
     else {
@@ -250,17 +229,16 @@ void KateBuildView::readSessionConfig(const KConfigGroup& cg)
             }
 
         }
-        tmpIndex = cg.readEntry(QStringLiteral("Active Target Index"), 0);
         tmpCmd = cg.readEntry(QStringLiteral("Active Target Command"), 0);
     }
 
+#if 0
     m_targetsUi->targetsView->expandAll();
     m_targetsUi->targetsView->resizeColumnToContents(0);
     m_targetsUi->targetsView->collapseAll();
+#endif
 
-    QModelIndex root = m_targetsModel.index(tmpIndex);
-    QModelIndex cmdIndex = m_targetsModel.index(tmpCmd, 0, root);
-    m_targetsUi->targetsView->setCurrentIndex(cmdIndex);
+    m_buildUi.targetCombo->setCurrentIndex(tmpCmd);
 }
 
 /******************************************************************/
@@ -285,19 +263,9 @@ void KateBuildView::writeSessionConfig(KConfigGroup& cg)
         cg.writeEntry(QStringLiteral("%1 Target Names").arg(i), cmdNames);
         cg.writeEntry(QStringLiteral("%1 Target Default").arg(i), targets[i].defaultCmd);
     }
-    int setRow = 0;
-    int set = 0;
-    QModelIndex ind = m_targetsUi->targetsView->currentIndex();
-    if (ind.internalId() == TargetModel::InvalidIndex) {
-        set = ind.row();
-    }
-    else {
-        set = ind.internalId();
-        setRow = ind.row();
-    }
-    if (setRow < 0) setRow = 0;
 
-    cg.writeEntry(QStringLiteral("Active Target Index"), set);
+    const int setRow = qMax(m_buildUi.targetCombo->currentIndex(), 0);
+
     cg.writeEntry(QStringLiteral("Active Target Command"), setRow);
     slotAddProjectTarget();
 }
@@ -484,7 +452,6 @@ bool KateBuildView::startProcess(const QString &dir, const QString &command)
     clearBuildResults();
 
     // activate the output tab
-    m_buildUi.u_tabWidget->setCurrentIndex(1);
     m_displayModeBeforeBuild = m_buildUi.displayModeSlider->value();
     m_buildUi.displayModeSlider->setValue(0);
     m_win->showToolView(m_toolView);
@@ -503,9 +470,7 @@ bool KateBuildView::startProcess(const QString &dir, const QString &command)
     }
 
     m_buildUi.cancelBuildButton->setEnabled(true);
-    m_buildUi.cancelBuildButton2->setEnabled(true);
-    m_buildUi.buildAgainButton->setEnabled(false);
-    m_buildUi.buildAgainButton2->setEnabled(false);
+    m_buildUi.buildButton->setEnabled(false);
 
     QApplication::setOverrideCursor(QCursor(Qt::BusyCursor));
     return true;
@@ -518,7 +483,6 @@ bool KateBuildView::slotStop()
         m_buildCancelled = true;
         QString msg = i18n("Building <b>%1</b> cancelled", m_currentlyBuildingTarget);
         m_buildUi.buildStatusLabel->setText(msg);
-        m_buildUi.buildStatusLabel2->setText(msg);
         m_proc.terminate();
         return true;
     }
@@ -527,43 +491,23 @@ bool KateBuildView::slotStop()
 
 /******************************************************************/
 void KateBuildView::slotBuildActiveTarget() {
-    if (!m_targetsUi->targetsView->currentIndex().isValid()) {
+    if (m_buildUi.targetCombo->currentIndex() < 0) {
         slotSelectTarget();
     }
     else {
         buildCurrentTarget();
     }
 }
-
-/******************************************************************/
-void KateBuildView::slotBuildPreviousTarget() {
-    if (!m_previousIndex.isValid()) {
-        slotSelectTarget();
-    }
-    else {
-        m_targetsUi->targetsView->setCurrentIndex(m_previousIndex);
-        buildCurrentTarget();
-    }
-}
-
-
-/******************************************************************/
-void KateBuildView::slotBuildDefaultTarget() {
-    QModelIndex defaultTarget = m_targetsModel.defaultTarget(m_targetsUi->targetsView->currentIndex());
-    m_targetsUi->targetsView->setCurrentIndex(defaultTarget);
-    buildCurrentTarget();
-}
-
 
 /******************************************************************/
 void KateBuildView::slotSelectTarget() {
     SelectTargetView *dialog = new SelectTargetView(&(m_targetsModel));
 
-    dialog->setCurrentIndex(m_targetsUi->targetsView->currentIndex());
+    dialog->setCurrentIndex(m_proxyModel.mapToSource(m_proxyModel.index(m_buildUi.targetCombo->currentIndex(), 0)));
 
     int result = dialog->exec();
     if (result == QDialog::Accepted) {
-        m_targetsUi->targetsView->setCurrentIndex(dialog->currentIndex());
+        m_buildUi.targetCombo->setCurrentIndex(m_proxyModel.mapFromSource(dialog->currentIndex()).row());
         buildCurrentTarget();
     }
     delete dialog;
@@ -581,7 +525,7 @@ bool KateBuildView::buildCurrentTarget()
 
     QFileInfo docFInfo = docUrl().toLocalFile(); // docUrl() saves the current document
 
-    QModelIndex ind = m_targetsUi->targetsView->currentIndex();
+    QModelIndex ind = m_proxyModel.mapToSource(m_proxyModel.index(m_buildUi.targetCombo->currentIndex(), 0));
     m_previousIndex = ind;
     if (!ind.isValid()) {
         KMessageBox::sorry(0, i18n("No target available for building."));
@@ -620,7 +564,6 @@ bool KateBuildView::buildCurrentTarget()
     m_buildCancelled = false;
     QString msg = i18n("Building target <b>%1</b> ...", m_currentlyBuildingTarget);
     m_buildUi.buildStatusLabel->setText(msg);
-    m_buildUi.buildStatusLabel2->setText(msg);
     return startProcess(dir, buildCmd);
 }
 
@@ -645,15 +588,12 @@ void KateBuildView::slotProcExited(int exitCode, QProcess::ExitStatus)
 {
     QApplication::restoreOverrideCursor();
     m_buildUi.cancelBuildButton->setEnabled(false);
-    m_buildUi.cancelBuildButton2->setEnabled(false);
-    m_buildUi.buildAgainButton->setEnabled(true);
-    m_buildUi.buildAgainButton2->setEnabled(true);
+    m_buildUi.buildButton->setEnabled(true);
 
     QString buildStatus = i18n("Building <b>%1</b> completed.", m_currentlyBuildingTarget);
 
     // did we get any errors?
     if (m_numErrors || m_numWarnings || (exitCode != 0)) {
-       m_buildUi.u_tabWidget->setCurrentIndex(1);
        if (m_buildUi.displayModeSlider->value() == 0) {
            m_buildUi.displayModeSlider->setValue(m_displayModeBeforeBuild > 0 ? m_displayModeBeforeBuild: 1);
        }
@@ -686,7 +626,6 @@ void KateBuildView::slotProcExited(int exitCode, QProcess::ExitStatus)
 
     if (!m_buildCancelled) {
         m_buildUi.buildStatusLabel->setText(buildStatus);
-        m_buildUi.buildStatusLabel2->setText(buildStatus);
         m_buildCancelled = false;
     }
 
@@ -973,21 +912,6 @@ bool KateBuildView::eventFilter(QObject *obj, QEvent *event)
             event->accept();
             return true;
         }
-    }
-    if ((event->type() == QEvent::Resize) && (obj == m_buildWidget)) {
-        if (m_buildUi.u_tabWidget->currentIndex() == 1) {
-            if ((m_outputWidgetWidth == 0) && m_buildUi.buildAgainButton->isVisible()) {
-                QSize msh = m_buildWidget->minimumSizeHint();
-                m_outputWidgetWidth = msh.width();
-            }
-        }
-        bool useVertLayout = (m_buildWidget->width() < m_outputWidgetWidth);
-        m_buildUi.buildAgainButton->setVisible(!useVertLayout);
-        m_buildUi.cancelBuildButton->setVisible(!useVertLayout);
-        m_buildUi.buildStatusLabel->setVisible(!useVertLayout);
-        m_buildUi.buildAgainButton2->setVisible(useVertLayout);
-        m_buildUi.cancelBuildButton2->setVisible(useVertLayout);
-        m_buildUi.buildStatusLabel2->setVisible(useVertLayout);
     }
 
     return QObject::eventFilter(obj, event);

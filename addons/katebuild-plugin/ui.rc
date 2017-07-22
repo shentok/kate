@@ -5,8 +5,6 @@
     <Menu name="Build Menubar">
       <text>&amp;Build</text>
       <Action name="select_target"/>
-      <Action name="build_default_target" />
-      <Action name="build_previous_target"/>
       <Action name="stop"/>
       <Separator/>
       <Action name="goto_prev"/>

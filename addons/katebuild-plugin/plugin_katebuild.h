@@ -43,7 +43,6 @@
 
 #include "ui_build.h"
 #include "TargetModel.h"
-#include "targets.h"
 
 /******************************************************************/
 class KateBuildView : public QObject, public KXMLGUIClient, public KTextEditor::SessionConfigInterface
@@ -84,8 +83,6 @@ class KateBuildView : public QObject, public KXMLGUIClient, public KTextEditor::
         // Building
         void slotSelectTarget();
         void slotBuildActiveTarget();
-        void slotBuildPreviousTarget();
-        void slotBuildDefaultTarget();
         bool slotStop();
 
         // Parse output
@@ -128,9 +125,8 @@ class KateBuildView : public QObject, public KXMLGUIClient, public KTextEditor::
         QWidget          *m_toolView;
         Ui::build         m_buildUi;
         QWidget          *m_buildWidget;
-        int               m_outputWidgetWidth;
-        TargetsUi        *m_targetsUi;
         TargetModel       m_targetsModel;
+        ProxyModel        m_proxyModel;
         KProcess          m_proc;
         QString           m_stdOut;
         QString           m_stdErr;

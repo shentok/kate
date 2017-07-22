@@ -469,3 +469,66 @@ QModelIndex TargetModel::parent(const QModelIndex &child) const
     return createIndex(child.internalId(), 0, InvalidIndex);
 }
 
+
+ProxyModel::ProxyModel(QObject *parent) :
+    QAbstractProxyModel(parent),
+    m_outerProxyModel(),
+    m_innerProxyModel()
+{
+    m_outerProxyModel.setSourceModel(&m_innerProxyModel);
+}
+
+void ProxyModel::setSourceModel(QAbstractItemModel *sourceModel)
+{
+    m_innerProxyModel.setSourceModel(sourceModel);
+}
+
+QModelIndex ProxyModel::index(int row, int column, const QModelIndex &parent) const
+{
+    return m_outerProxyModel.index(row, column, parent);
+}
+
+QModelIndex ProxyModel::parent(const QModelIndex &child) const
+{
+    return m_outerProxyModel.parent(child);
+}
+
+int ProxyModel::rowCount(const QModelIndex &parent) const
+{
+    return m_outerProxyModel.rowCount(parent);
+}
+
+int ProxyModel::columnCount(const QModelIndex &parent) const
+{
+    return m_outerProxyModel.columnCount(parent);
+}
+
+QModelIndex ProxyModel::mapToSource(const QModelIndex &outerProxyIndex) const
+{
+    const QModelIndex innerProxyIndex = m_outerProxyModel.mapToSource(outerProxyIndex);
+
+    return m_innerProxyModel.mapToSource(innerProxyIndex);
+}
+
+QModelIndex ProxyModel::mapFromSource(const QModelIndex &sourceIndex) const
+{
+    const QModelIndex innerProxyIndex = m_innerProxyModel.mapFromSource(sourceIndex);
+
+    return m_outerProxyModel.mapFromSource(innerProxyIndex);
+}
+
+ProxyModel::FilterProxyModel::FilterProxyModel(QObject *parent) :
+    KRecursiveFilterProxyModel(parent)
+{
+}
+
+bool ProxyModel::FilterProxyModel::filterAcceptsRow(int source_row, const QModelIndex &source_parent) const
+{
+    Q_UNUSED(source_row)
+
+    if (!source_parent.isValid()) {
+        return false;
+    }
+
+    return true;
+}
