@@ -52,7 +52,7 @@
 #include <kpluginloader.h>
 #include <kaboutdata.h>
 
-
+#include "OutputView.h"
 #include "SelectTargetView.h"
 
 K_PLUGIN_FACTORY_WITH_JSON (KateBuildPluginFactory, "katebuildplugin.json", registerPlugin<KateBuildPlugin>();)
@@ -136,28 +136,13 @@ KateBuildView::KateBuildView(KTextEditor::Plugin *plugin, KTextEditor::MainWindo
 
     m_targetsUi->setModel(&m_targetsModel);
 
-    m_buildUi.buildAgainButton->setVisible(true);
-    m_buildUi.cancelBuildButton->setVisible(true);
-    m_buildUi.buildStatusLabel->setVisible(true);
-    m_buildUi.buildAgainButton2->setVisible(false);
-    m_buildUi.cancelBuildButton2->setVisible(false);
-    m_buildUi.buildStatusLabel2->setVisible(false);
-    m_buildUi.extraLineLayout->setAlignment(Qt::AlignRight);
-    m_buildUi.cancelBuildButton->setEnabled(false);
-    m_buildUi.cancelBuildButton2->setEnabled(false);
-
-    connect(m_buildUi.errTreeWidget, SIGNAL(itemClicked(QTreeWidgetItem*,int)),
+    connect(m_buildUi.outputView->errTreeWidget, SIGNAL(itemClicked(QTreeWidgetItem*,int)),
             SLOT(slotErrorSelected(QTreeWidgetItem*)));
 
-    m_buildUi.plainTextEdit->setReadOnly(true);
-    slotDisplayMode(FullOutput);
-
-    connect(m_buildUi.displayModeSlider, SIGNAL(valueChanged(int)), this, SLOT(slotDisplayMode(int)));
-
-    connect(m_buildUi.buildAgainButton, SIGNAL(clicked()), this, SLOT(slotBuildPreviousTarget()));
-    connect(m_buildUi.cancelBuildButton, SIGNAL(clicked()), this, SLOT(slotStop()));
-    connect(m_buildUi.buildAgainButton2, SIGNAL(clicked()), this, SLOT(slotBuildPreviousTarget()));
-    connect(m_buildUi.cancelBuildButton2, SIGNAL(clicked()), this, SLOT(slotStop()));
+    connect(m_buildUi.outputView->buildAgainButton, SIGNAL(clicked()), this, SLOT(slotBuildPreviousTarget()));
+    connect(m_buildUi.outputView->cancelBuildButton, SIGNAL(clicked()), this, SLOT(slotStop()));
+    connect(m_buildUi.outputView->buildAgainButton2, SIGNAL(clicked()), this, SLOT(slotBuildPreviousTarget()));
+    connect(m_buildUi.outputView->cancelBuildButton2, SIGNAL(clicked()), this, SLOT(slotStop()));
 
     connect(m_targetsUi->buildButton, SIGNAL(clicked()), this, SLOT(slotBuildActiveTarget()));
     connect(m_targetsUi, SIGNAL(enterPressed()), this, SLOT(slotBuildActiveTarget()));
@@ -304,21 +289,21 @@ void KateBuildView::writeSessionConfig(KConfigGroup& cg)
 /******************************************************************/
 void KateBuildView::slotNext()
 {
-    const int itemCount = m_buildUi.errTreeWidget->topLevelItemCount();
+    const int itemCount = m_buildUi.outputView->errTreeWidget->topLevelItemCount();
     if (itemCount == 0) {
         return;
     }
 
-    QTreeWidgetItem *item = m_buildUi.errTreeWidget->currentItem();
+    QTreeWidgetItem *item = m_buildUi.outputView->errTreeWidget->currentItem();
     if (item && item->isHidden()) item = 0;
 
-    int i = (item == 0) ? -1 : m_buildUi.errTreeWidget->indexOfTopLevelItem(item);
+    int i = (item == 0) ? -1 : m_buildUi.outputView->errTreeWidget->indexOfTopLevelItem(item);
 
     while (++i < itemCount) {
-        item = m_buildUi.errTreeWidget->topLevelItem(i);
+        item = m_buildUi.outputView->errTreeWidget->topLevelItem(i);
         if (!item->text(1).isEmpty() && !item->isHidden()) {
-            m_buildUi.errTreeWidget->setCurrentItem(item);
-            m_buildUi.errTreeWidget->scrollToItem(item);
+            m_buildUi.outputView->errTreeWidget->setCurrentItem(item);
+            m_buildUi.outputView->errTreeWidget->scrollToItem(item);
             slotErrorSelected(item);
             return;
         }
@@ -328,21 +313,21 @@ void KateBuildView::slotNext()
 /******************************************************************/
 void KateBuildView::slotPrev()
 {
-    const int itemCount = m_buildUi.errTreeWidget->topLevelItemCount();
+    const int itemCount = m_buildUi.outputView->errTreeWidget->topLevelItemCount();
     if (itemCount == 0) {
         return;
     }
 
-    QTreeWidgetItem *item = m_buildUi.errTreeWidget->currentItem();
+    QTreeWidgetItem *item = m_buildUi.outputView->errTreeWidget->currentItem();
     if (item && item->isHidden()) item = 0;
 
-    int i = (item == 0) ? itemCount : m_buildUi.errTreeWidget->indexOfTopLevelItem(item);
+    int i = (item == 0) ? itemCount : m_buildUi.outputView->errTreeWidget->indexOfTopLevelItem(item);
 
     while (--i >= 0) {
-        item = m_buildUi.errTreeWidget->topLevelItem(i);
+        item = m_buildUi.outputView->errTreeWidget->topLevelItem(i);
         if (!item->text(1).isEmpty() && !item->isHidden()) {
-            m_buildUi.errTreeWidget->setCurrentItem(item);
-            m_buildUi.errTreeWidget->scrollToItem(item);
+            m_buildUi.outputView->errTreeWidget->setCurrentItem(item);
+            m_buildUi.outputView->errTreeWidget->scrollToItem(item);
             slotErrorSelected(item);
             return;
         }
@@ -378,7 +363,7 @@ void KateBuildView::addError(const QString &filename, const QString &line,
 {
     bool isError=false;
     bool isWarning=false;
-    QTreeWidgetItem* item = new QTreeWidgetItem(m_buildUi.errTreeWidget);
+    QTreeWidgetItem* item = new QTreeWidgetItem(m_buildUi.outputView->errTreeWidget);
     item->setBackground(1, Qt::gray);
     // The strings are twice in case kate is translated but not make.
     if (message.contains(QStringLiteral("error")) ||
@@ -399,7 +384,7 @@ void KateBuildView::addError(const QString &filename, const QString &line,
         isWarning=true;
         item->setForeground(1, Qt::yellow);
         m_numWarnings++;
-        item->setHidden(m_buildUi.displayModeSlider->value() > 2);
+        item->setHidden(m_buildUi.outputView->displayModeSlider->value() > 2);
     }
     item->setTextAlignment(1, Qt::AlignRight);
 
@@ -416,11 +401,11 @@ void KateBuildView::addError(const QString &filename, const QString &line,
     item->setData(2, Qt::UserRole, column);
 
     if ((isError==false) && (isWarning==false)) {
-      item->setHidden(m_buildUi.displayModeSlider->value() > 1);
+      item->setHidden(m_buildUi.outputView->displayModeSlider->value() > 1);
     }
 
-    item->setData(0, IsErrorRole, isError);
-    item->setData(0, IsWarningRole, isWarning);
+    item->setData(0, OutputView::IsErrorRole, isError);
+    item->setData(0, OutputView::IsWarningRole, isWarning);
 
     // add tooltips in all columns
     // The enclosing <qt>...</qt> enables word-wrap for long error messages
@@ -462,8 +447,8 @@ bool KateBuildView::checkLocal(const QUrl &dir)
 /******************************************************************/
 void KateBuildView::clearBuildResults()
 {
-    m_buildUi.plainTextEdit->clear();
-    m_buildUi.errTreeWidget->clear();
+    m_buildUi.outputView->plainTextEdit->clear();
+    m_buildUi.outputView->errTreeWidget->clear();
     m_output_lines.clear();
     m_numErrors = 0;
     m_numWarnings = 0;
@@ -482,8 +467,8 @@ bool KateBuildView::startProcess(const QString &dir, const QString &command)
 
     // activate the output tab
     m_buildUi.u_tabWidget->setCurrentIndex(1);
-    m_displayModeBeforeBuild = m_buildUi.displayModeSlider->value();
-    m_buildUi.displayModeSlider->setValue(0);
+    m_displayModeBeforeBuild = m_buildUi.outputView->displayModeSlider->value();
+    m_buildUi.outputView->displayModeSlider->setValue(0);
     m_win->showToolView(m_toolView);
 
     // set working directory
@@ -499,10 +484,10 @@ bool KateBuildView::startProcess(const QString &dir, const QString &command)
         return false;
     }
 
-    m_buildUi.cancelBuildButton->setEnabled(true);
-    m_buildUi.cancelBuildButton2->setEnabled(true);
-    m_buildUi.buildAgainButton->setEnabled(false);
-    m_buildUi.buildAgainButton2->setEnabled(false);
+    m_buildUi.outputView->cancelBuildButton->setEnabled(true);
+    m_buildUi.outputView->cancelBuildButton2->setEnabled(true);
+    m_buildUi.outputView->buildAgainButton->setEnabled(false);
+    m_buildUi.outputView->buildAgainButton2->setEnabled(false);
 
     QApplication::setOverrideCursor(QCursor(Qt::BusyCursor));
     return true;
@@ -514,8 +499,8 @@ bool KateBuildView::slotStop()
     if (m_proc.state() != QProcess::NotRunning) {
         m_buildCancelled = true;
         QString msg = i18n("Building <b>%1</b> cancelled", m_currentlyBuildingTarget);
-        m_buildUi.buildStatusLabel->setText(msg);
-        m_buildUi.buildStatusLabel2->setText(msg);
+        m_buildUi.outputView->buildStatusLabel->setText(msg);
+        m_buildUi.outputView->buildStatusLabel2->setText(msg);
         m_proc.terminate();
         return true;
     }
@@ -617,8 +602,8 @@ bool KateBuildView::buildCurrentTarget()
     m_currentlyBuildingTarget = QStringLiteral("%1: %2").arg(targetSet).arg(cmdName);
     m_buildCancelled = false;
     QString msg = i18n("Building target <b>%1</b> ...", m_currentlyBuildingTarget);
-    m_buildUi.buildStatusLabel->setText(msg);
-    m_buildUi.buildStatusLabel2->setText(msg);
+    m_buildUi.outputView->buildStatusLabel->setText(msg);
+    m_buildUi.outputView->buildStatusLabel2->setText(msg);
     return startProcess(dir, buildCmd);
 }
 
@@ -642,24 +627,24 @@ void KateBuildView::displayBuildResult(const QString &msg, KTextEditor::Message:
 void KateBuildView::slotProcExited(int exitCode, QProcess::ExitStatus)
 {
     QApplication::restoreOverrideCursor();
-    m_buildUi.cancelBuildButton->setEnabled(false);
-    m_buildUi.cancelBuildButton2->setEnabled(false);
-    m_buildUi.buildAgainButton->setEnabled(true);
-    m_buildUi.buildAgainButton2->setEnabled(true);
+    m_buildUi.outputView->cancelBuildButton->setEnabled(false);
+    m_buildUi.outputView->cancelBuildButton2->setEnabled(false);
+    m_buildUi.outputView->buildAgainButton->setEnabled(true);
+    m_buildUi.outputView->buildAgainButton2->setEnabled(true);
 
     QString buildStatus = i18n("Building <b>%1</b> completed.", m_currentlyBuildingTarget);
 
     // did we get any errors?
     if (m_numErrors || m_numWarnings || (exitCode != 0)) {
        m_buildUi.u_tabWidget->setCurrentIndex(1);
-       if (m_buildUi.displayModeSlider->value() == 0) {
-           m_buildUi.displayModeSlider->setValue(m_displayModeBeforeBuild > 0 ? m_displayModeBeforeBuild: 1);
+       if (m_buildUi.outputView->displayModeSlider->value() == 0) {
+           m_buildUi.outputView->displayModeSlider->setValue(m_displayModeBeforeBuild > 0 ? m_displayModeBeforeBuild: 1);
        }
-       m_buildUi.errTreeWidget->resizeColumnToContents(0);
-       m_buildUi.errTreeWidget->resizeColumnToContents(1);
-       m_buildUi.errTreeWidget->resizeColumnToContents(2);
-       m_buildUi.errTreeWidget->horizontalScrollBar()->setValue(0);
-        //m_buildUi.errTreeWidget->setSortingEnabled(true);
+       m_buildUi.outputView->errTreeWidget->resizeColumnToContents(0);
+       m_buildUi.outputView->errTreeWidget->resizeColumnToContents(1);
+       m_buildUi.outputView->errTreeWidget->resizeColumnToContents(2);
+       m_buildUi.outputView->errTreeWidget->horizontalScrollBar()->setValue(0);
+        //m_buildUi.output->errTreeWidget->setSortingEnabled(true);
         m_win->showToolView(m_toolView);
     }
 
@@ -683,8 +668,8 @@ void KateBuildView::slotProcExited(int exitCode, QProcess::ExitStatus)
     }
 
     if (!m_buildCancelled) {
-        m_buildUi.buildStatusLabel->setText(buildStatus);
-        m_buildUi.buildStatusLabel2->setText(buildStatus);
+        m_buildUi.outputView->buildStatusLabel->setText(buildStatus);
+        m_buildUi.outputView->buildStatusLabel2->setText(buildStatus);
         m_buildCancelled = false;
     }
 
@@ -713,7 +698,7 @@ void KateBuildView::slotReadReadyStdOut()
         end++;
         tmp = m_output_lines.mid(0, end);
         tmp.remove(QLatin1Char('\n'));
-        m_buildUi.plainTextEdit->appendPlainText(tmp);
+        m_buildUi.outputView->plainTextEdit->appendPlainText(tmp);
         //qDebug() << tmp;
         if (tmp.indexOf(m_newDirDetector) >=0) {
             //qDebug() << "Enter/Exit dir found";
@@ -758,7 +743,7 @@ void KateBuildView::slotReadReadyStdErr()
         end++;
         tmp = m_output_lines.mid(0, end);
         tmp.remove(QLatin1Char('\n'));
-        m_buildUi.plainTextEdit->appendPlainText(tmp);
+        m_buildUi.outputView->plainTextEdit->appendPlainText(tmp);
 
         processLine(tmp);
 
@@ -827,55 +812,6 @@ void KateBuildView::processLine(const QString &line)
     addError(filename, line_n, QString(), msg);
 }
 
-
-/******************************************************************/
-void KateBuildView::slotDisplayMode(int mode) {
-    QTreeWidget *tree=m_buildUi.errTreeWidget;
-    tree->setVisible(mode != 0);
-    m_buildUi.plainTextEdit->setVisible(mode == 0);
-
-    QString modeText;
-    switch(mode)
-    {
-        case OnlyErrors:
-            modeText = i18n("Only Errors");
-            break;
-        case ErrorsAndWarnings:
-            modeText = i18n("Errors and Warnings");
-            break;
-        case ParsedOutput:
-            modeText = i18n("Parsed Output");
-            break;
-        case FullOutput:
-            modeText = i18n("Full Output");
-            break;
-    }
-    m_buildUi.displayModeLabel->setText(modeText);
-
-    if (mode < 1) {
-        return;
-    }
-
-    const int itemCount = tree->topLevelItemCount();
-
-    for (int i=0;i<itemCount;i++) {
-        QTreeWidgetItem* item=tree->topLevelItem(i);
-
-        if ( (item->data(0, IsWarningRole).toBool()==false) &&
-            (item->data(0, IsErrorRole).toBool()==false) )
-        {
-            item->setHidden(mode > 1);
-        }
-
-        if (item->data(0, IsWarningRole).toBool()==true) {
-            item->setHidden(mode > 2);
-        }
-
-        if (item->data(0, IsErrorRole).toBool()==true) {
-            item->setHidden(false);
-        }
-    }
-}
 
 /******************************************************************/
 void KateBuildView::slotPluginViewCreated (const QString &name, QObject *pluginView)
@@ -974,18 +910,18 @@ bool KateBuildView::eventFilter(QObject *obj, QEvent *event)
     }
     if ((event->type() == QEvent::Resize) && (obj == m_buildWidget)) {
         if (m_buildUi.u_tabWidget->currentIndex() == 1) {
-            if ((m_outputWidgetWidth == 0) && m_buildUi.buildAgainButton->isVisible()) {
+            if ((m_outputWidgetWidth == 0) && m_buildUi.outputView->buildAgainButton->isVisible()) {
                 QSize msh = m_buildWidget->minimumSizeHint();
                 m_outputWidgetWidth = msh.width();
             }
         }
         bool useVertLayout = (m_buildWidget->width() < m_outputWidgetWidth);
-        m_buildUi.buildAgainButton->setVisible(!useVertLayout);
-        m_buildUi.cancelBuildButton->setVisible(!useVertLayout);
-        m_buildUi.buildStatusLabel->setVisible(!useVertLayout);
-        m_buildUi.buildAgainButton2->setVisible(useVertLayout);
-        m_buildUi.cancelBuildButton2->setVisible(useVertLayout);
-        m_buildUi.buildStatusLabel2->setVisible(useVertLayout);
+        m_buildUi.outputView->buildAgainButton->setVisible(!useVertLayout);
+        m_buildUi.outputView->cancelBuildButton->setVisible(!useVertLayout);
+        m_buildUi.outputView->buildStatusLabel->setVisible(!useVertLayout);
+        m_buildUi.outputView->buildAgainButton2->setVisible(useVertLayout);
+        m_buildUi.outputView->cancelBuildButton2->setVisible(useVertLayout);
+        m_buildUi.outputView->buildStatusLabel2->setVisible(useVertLayout);
     }
 
     return QObject::eventFilter(obj, event);
