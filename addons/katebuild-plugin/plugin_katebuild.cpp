@@ -134,6 +134,8 @@ KateBuildView::KateBuildView(KTextEditor::Plugin *plugin, KTextEditor::MainWindo
 
     m_buildWidget->installEventFilter(this);
 
+    m_targetsUi->setModel(&m_targetsModel);
+
     m_buildUi.buildAgainButton->setVisible(true);
     m_buildUi.cancelBuildButton->setVisible(true);
     m_buildUi.buildStatusLabel->setVisible(true);
@@ -201,20 +203,20 @@ QWidget *KateBuildView::toolView() const
 void KateBuildView::readSessionConfig(const KConfigGroup& cg)
 {
     int numTargets = cg.readEntry(QStringLiteral("NumTargets"), 0);
-    m_targetsUi->targetsModel.clear();
+    m_targetsModel.clear();
     int tmpIndex;
     int tmpCmd;
 
     if (numTargets == 0 ) {
         // either the config is empty or uses the older format
-        m_targetsUi->targetsModel.addTargetSet(i18n("Target Set"), QString());
-        m_targetsUi->targetsModel.addCommand(0, i18n("build"), cg.readEntry(QStringLiteral("Make Command"), TargetModel::DefBuildCmd));
-        m_targetsUi->targetsModel.addCommand(0, i18n("clean"), cg.readEntry(QStringLiteral("Clean Command"), TargetModel::DefCleanCmd));
-        m_targetsUi->targetsModel.addCommand(0, i18n("config"), TargetModel::DefConfigCmd);
+        m_targetsModel.addTargetSet(i18n("Target Set"), QString());
+        m_targetsModel.addCommand(0, i18n("build"), cg.readEntry(QStringLiteral("Make Command"), TargetModel::DefBuildCmd));
+        m_targetsModel.addCommand(0, i18n("clean"), cg.readEntry(QStringLiteral("Clean Command"), TargetModel::DefCleanCmd));
+        m_targetsModel.addCommand(0, i18n("config"), TargetModel::DefConfigCmd);
 
         QString quickCmd = cg.readEntry(QStringLiteral("Quick Compile Command"));
         if (!quickCmd.isEmpty()) {
-            m_targetsUi->targetsModel.addCommand(0, i18n("quick"), quickCmd);
+            m_targetsModel.addCommand(0, i18n("quick"), quickCmd);
         }
         tmpIndex = 0;
         tmpCmd = 0;
@@ -225,24 +227,24 @@ void KateBuildView::readSessionConfig(const KConfigGroup& cg)
             QString targetSetName = cg.readEntry(QStringLiteral("%1 Target").arg(i), QString());
             QString buildDir = cg.readEntry(QStringLiteral("%1 BuildPath").arg(i), QString());
 
-            m_targetsUi->targetsModel.addTargetSet(targetSetName, buildDir);
+            m_targetsModel.addTargetSet(targetSetName, buildDir);
 
             if (targetNames.isEmpty()) {
                 QString quickCmd = cg.readEntry(QStringLiteral("%1 QuickCmd").arg(i));
-                m_targetsUi->targetsModel.addCommand(i, i18n("build"), cg.readEntry(QStringLiteral("%1 BuildCmd"), TargetModel::DefBuildCmd));
-                m_targetsUi->targetsModel.addCommand(i, i18n("clean"), cg.readEntry(QStringLiteral("%1 CleanCmd"), TargetModel::DefCleanCmd));
+                m_targetsModel.addCommand(i, i18n("build"), cg.readEntry(QStringLiteral("%1 BuildCmd"), TargetModel::DefBuildCmd));
+                m_targetsModel.addCommand(i, i18n("clean"), cg.readEntry(QStringLiteral("%1 CleanCmd"), TargetModel::DefCleanCmd));
                 if (!quickCmd.isEmpty()) {
-                    m_targetsUi->targetsModel.addCommand(i, i18n("quick"), quickCmd);
+                    m_targetsModel.addCommand(i, i18n("quick"), quickCmd);
                 }
-                m_targetsUi->targetsModel.setDefaultCmd(i, i18n("build"));
+                m_targetsModel.setDefaultCmd(i, i18n("build"));
             }
             else {
                 for (int tn=0; tn<targetNames.size(); ++tn) {
                     const QString targetName = targetNames.at(tn);
-                    m_targetsUi->targetsModel.addCommand(i, targetName, cg.readEntry(QStringLiteral("%1 BuildCmd %2").arg(i).arg(targetName), TargetModel::DefBuildCmd));
+                    m_targetsModel.addCommand(i, targetName, cg.readEntry(QStringLiteral("%1 BuildCmd %2").arg(i).arg(targetName), TargetModel::DefBuildCmd));
                 }
                 QString defCmd = cg.readEntry(QStringLiteral("%1 Target Default").arg(i), QString());
-                m_targetsUi->targetsModel.setDefaultCmd(i, defCmd);
+                m_targetsModel.setDefaultCmd(i, defCmd);
             }
 
         }
@@ -254,16 +256,16 @@ void KateBuildView::readSessionConfig(const KConfigGroup& cg)
     m_targetsUi->targetsView->resizeColumnToContents(0);
     m_targetsUi->targetsView->collapseAll();
 
-    QModelIndex root = m_targetsUi->targetsModel.index(tmpIndex);
-    QModelIndex cmdIndex = m_targetsUi->targetsModel.index(tmpCmd, 0, root);
+    QModelIndex root = m_targetsModel.index(tmpIndex);
+    QModelIndex cmdIndex = m_targetsModel.index(tmpCmd, 0, root);
     m_targetsUi->targetsView->setCurrentIndex(cmdIndex);
 }
 
 /******************************************************************/
 void KateBuildView::writeSessionConfig(KConfigGroup& cg)
 {
-    m_targetsUi->targetsModel.deleteTargetSet(i18n("Project Plugin Targets"));
-    QList<TargetModel::TargetSet> targets = m_targetsUi->targetsModel.targetSets();
+    m_targetsModel.deleteTargetSet(i18n("Project Plugin Targets"));
+    QList<TargetModel::TargetSet> targets = m_targetsModel.targetSets();
 
     cg.writeEntry("NumTargets", targets.size());
 
@@ -544,7 +546,7 @@ void KateBuildView::slotBuildPreviousTarget() {
 
 /******************************************************************/
 void KateBuildView::slotBuildDefaultTarget() {
-    QModelIndex defaultTarget = m_targetsUi->targetsModel.defaultTarget(m_targetsUi->targetsView->currentIndex());
+    QModelIndex defaultTarget = m_targetsModel.defaultTarget(m_targetsUi->targetsView->currentIndex());
     m_targetsUi->targetsView->setCurrentIndex(defaultTarget);
     buildCurrentTarget();
 }
@@ -552,7 +554,7 @@ void KateBuildView::slotBuildDefaultTarget() {
 
 /******************************************************************/
 void KateBuildView::slotSelectTarget() {
-    SelectTargetView *dialog = new SelectTargetView(&(m_targetsUi->targetsModel));
+    SelectTargetView *dialog = new SelectTargetView(&(m_targetsModel));
 
     dialog->setCurrentIndex(m_targetsUi->targetsView->currentIndex());
 
@@ -583,10 +585,10 @@ bool KateBuildView::buildCurrentTarget()
         return false;
     }
 
-    QString buildCmd = m_targetsUi->targetsModel.command(ind);
-    QString cmdName = m_targetsUi->targetsModel.cmdName(ind);
-    QString workDir = m_targetsUi->targetsModel.workDir(ind);
-    QString targetSet = m_targetsUi->targetsModel.targetName(ind);
+    QString buildCmd = m_targetsModel.command(ind);
+    QString cmdName = m_targetsModel.cmdName(ind);
+    QString workDir = m_targetsModel.workDir(ind);
+    QString targetSet = m_targetsModel.targetName(ind);
 
     QString dir = workDir;
     if (workDir.isEmpty()) {
@@ -892,7 +894,7 @@ void KateBuildView::slotPluginViewDeleted (const QString &name, QObject *)
     // remove view
     if (name == QLatin1String("kateprojectplugin")) {
         m_projectPluginView = 0;
-        m_targetsUi->targetsModel.deleteTargetSet(i18n("Project Plugin Targets"));
+        m_targetsModel.deleteTargetSet(i18n("Project Plugin Targets"));
     }
 }
 
@@ -903,7 +905,7 @@ void KateBuildView::slotProjectMapChanged ()
     if (!m_projectPluginView) {
         return;
     }
-    m_targetsUi->targetsModel.deleteTargetSet(i18n("Project Plugin Targets"));
+    m_targetsModel.deleteTargetSet(i18n("Project Plugin Targets"));
     slotAddProjectTarget();
 }
 
@@ -924,9 +926,9 @@ void KateBuildView::slotAddProjectTarget()
     }
 
     // Delete any old project plugin targets
-    m_targetsUi->targetsModel.deleteTargetSet(i18n("Project Plugin Targets"));
+    m_targetsModel.deleteTargetSet(i18n("Project Plugin Targets"));
 
-    int set = m_targetsUi->targetsModel.addTargetSet(i18n("Project Plugin Targets"),
+    int set = m_targetsModel.addTargetSet(i18n("Project Plugin Targets"),
                                                      buildMap.value(QStringLiteral("directory")).toString());
 
     QVariantList targetsets = buildMap.value(QStringLiteral("targets")).toList();
@@ -938,23 +940,23 @@ void KateBuildView::slotAddProjectTarget()
         if (tgtName.isEmpty() || buildCmd.isEmpty()) {
             continue;
         }
-        m_targetsUi->targetsModel.addCommand(set, tgtName, buildCmd);
+        m_targetsModel.addCommand(set, tgtName, buildCmd);
     }
 
-    QModelIndex ind = m_targetsUi->targetsModel.index(set);
+    QModelIndex ind = m_targetsModel.index(set);
     if (!ind.child(0,0).data().isValid()) {
         QString buildCmd = buildMap.value(QStringLiteral("build")).toString();
         QString cleanCmd = buildMap.value(QStringLiteral("clean")).toString();
         QString quickCmd = buildMap.value(QStringLiteral("quick")).toString();
         if (!buildCmd.isEmpty()) {
             // we have loaded an "old" project file (<= 4.12)
-            m_targetsUi->targetsModel.addCommand(set, i18n("build"), buildCmd);
+            m_targetsModel.addCommand(set, i18n("build"), buildCmd);
         }
         if (!cleanCmd.isEmpty()) {
-            m_targetsUi->targetsModel.addCommand(set, i18n("clean"), cleanCmd);
+            m_targetsModel.addCommand(set, i18n("clean"), cleanCmd);
         }
         if (!quickCmd.isEmpty()) {
-            m_targetsUi->targetsModel.addCommand(set, i18n("quick"), quickCmd);
+            m_targetsModel.addCommand(set, i18n("quick"), quickCmd);
         }
     }
 }

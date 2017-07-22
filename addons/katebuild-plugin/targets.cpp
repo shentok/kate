@@ -28,9 +28,7 @@ TargetsUi::TargetsUi(QObject *view, QWidget *parent):
 QWidget(parent)
 {
     setupUi(this);
-    targetCombo->setModel(&targetsModel);
 
-    targetsView->setModel(&targetsModel);
     m_delegate = new TargetHtmlDelegate(view);
     targetsView->setItemDelegate(m_delegate);
     targetsView->setSelectionBehavior(QAbstractItemView::SelectItems);
@@ -48,11 +46,18 @@ QWidget(parent)
     connect(deleteTarget, SIGNAL(clicked()), this, SLOT(targetDelete()));
 }
 
+void TargetsUi::setModel(TargetModel *targetsModel)
+{
+    m_targetsModel = targetsModel;
+    targetCombo->setModel(targetsModel);
+    targetsView->setModel(targetsModel);
+}
+
 void TargetsUi::targetSetSelected(int index)
 {
     //qDebug() << index;
     targetsView->collapseAll();
-    QModelIndex rootItem = targetsModel.index(index, 0);
+    QModelIndex rootItem = targetsView->model()->index(index, 0);
 
     targetsView->setExpanded(rootItem, true);
     targetsView->setCurrentIndex(rootItem.child(0,0));
@@ -92,36 +97,45 @@ void TargetsUi::slotAddTargetClicked()
     if (current.parent().isValid()) {
         current = current.parent();
     }
-    QModelIndex index = targetsModel.addCommand(current.row(), TargetModel::DefTargetName, TargetModel::DefBuildCmd);
-    targetsView->setCurrentIndex(index);
+
+    if (m_targetsModel) {
+        QModelIndex index = m_targetsModel->addCommand(current.row(), TargetModel::DefTargetName, TargetModel::DefBuildCmd);
+        targetsView->setCurrentIndex(index);
+    }
 }
 
 void TargetsUi::targetSetNew()
 {
-    int row = targetsModel.addTargetSet(i18n("Target Set"), QString());
-    QModelIndex buildIndex = targetsModel.addCommand(row, i18n("Build"), TargetModel::DefBuildCmd);
-    targetsModel.addCommand(row, i18n("Clean"), TargetModel::DefCleanCmd);
-    targetsModel.addCommand(row, i18n("Config"), TargetModel::DefConfigCmd);
-    targetsModel.addCommand(row, i18n("ConfigClean"), TargetModel::DefConfClean);
-    targetsView->setCurrentIndex(buildIndex);
+    if (m_targetsModel) {
+        int row = m_targetsModel->addTargetSet(i18n("Target Set"), QString());
+        QModelIndex buildIndex = m_targetsModel->addCommand(row, i18n("Build"), TargetModel::DefBuildCmd);
+        m_targetsModel->addCommand(row, i18n("Clean"), TargetModel::DefCleanCmd);
+        m_targetsModel->addCommand(row, i18n("Config"), TargetModel::DefConfigCmd);
+        m_targetsModel->addCommand(row, i18n("ConfigClean"), TargetModel::DefConfClean);
+        targetsView->setCurrentIndex(buildIndex);
+    }
 }
 
 void TargetsUi::targetOrSetCopy()
 {
-    QModelIndex newIndex = targetsModel.copyTargetOrSet(targetsView->currentIndex());
-    if (targetsModel.hasChildren(newIndex)) {
-        targetsView->setCurrentIndex(newIndex.child(0,0));
-        return;
+    if (m_targetsModel) {
+        QModelIndex newIndex = m_targetsModel->copyTargetOrSet(targetsView->currentIndex());
+        if (m_targetsModel->hasChildren(newIndex)) {
+            targetsView->setCurrentIndex(newIndex.child(0,0));
+            return;
+        }
+        targetsView->setCurrentIndex(newIndex);
     }
-    targetsView->setCurrentIndex(newIndex);
 }
 
 void TargetsUi::targetDelete()
 {
-    QModelIndex current = targetsView->currentIndex();
-    targetsModel.deleteItem(current);
+    if (m_targetsModel) {
+        QModelIndex current = targetsView->currentIndex();
+        m_targetsModel->deleteItem(current);
 
-    if (targetsModel.rowCount() == 0) {
-        targetSetNew();
+        if (m_targetsModel->rowCount() == 0) {
+            targetSetNew();
+        }
     }
 }

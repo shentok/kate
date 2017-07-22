@@ -28,6 +28,8 @@
 #include <QTreeView>
 #include <QComboBox>
 #include <QLabel>
+#include <QPointer>
+
 #include "TargetHtmlDelegate.h"
 #include "TargetModel.h"
 
@@ -38,8 +40,7 @@ class TargetsUi: public QWidget, public Ui::TargetsUi
 public:
     TargetsUi(QObject *view, QWidget *parent = 0);
 
-    TargetModel  targetsModel;
-
+    void setModel(TargetModel *targetsModel);
 
 public Q_SLOTS:
     void targetSetSelected(int index);
@@ -60,6 +61,7 @@ protected:
 
 private:
     TargetHtmlDelegate *m_delegate;
+    QPointer<TargetModel> m_targetsModel;
 };
 
 #endif

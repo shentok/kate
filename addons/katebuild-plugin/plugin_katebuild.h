@@ -42,6 +42,7 @@
 #include <KConfigGroup>
 
 #include "ui_build.h"
+#include "TargetModel.h"
 #include "targets.h"
 
 /******************************************************************/
@@ -129,6 +130,7 @@ class KateBuildView : public QObject, public KXMLGUIClient, public KTextEditor::
         QWidget          *m_buildWidget;
         int               m_outputWidgetWidth;
         TargetsUi        *m_targetsUi;
+        TargetModel       m_targetsModel;
         KProcess          m_proc;
         QString           m_output_lines;
         QString           m_currentlyBuildingTarget;
