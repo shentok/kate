@@ -23,6 +23,11 @@
 #include <QTimer>
 #include <klocalizedstring.h>
 
+const QString TargetModel::DefConfigCmd = QStringLiteral("cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=/usr/local ../");
+const QString TargetModel::DefConfClean;
+const QString TargetModel::DefTargetName = QStringLiteral("all");
+const QString TargetModel::DefBuildCmd = QStringLiteral("make");
+const QString TargetModel::DefCleanCmd = QStringLiteral("make clean");
 
 
 TargetModel::TargetSet::TargetSet(const QString &_name, const QString &_dir)

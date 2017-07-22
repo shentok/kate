@@ -57,13 +57,6 @@
 
 K_PLUGIN_FACTORY_WITH_JSON (KateBuildPluginFactory, "katebuildplugin.json", registerPlugin<KateBuildPlugin>();)
 
-static const QString DefConfigCmd = QStringLiteral("cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=/usr/local ../");
-static const QString DefConfClean;
-static const QString DefTargetName = QStringLiteral("all");
-static const QString DefBuildCmd = QStringLiteral("make");
-static const QString DefCleanCmd = QStringLiteral("make clean");
-
-
 /******************************************************************/
 KateBuildPlugin::KateBuildPlugin(QObject *parent, const VariantList&):
 KTextEditor::Plugin(parent)
@@ -164,11 +157,6 @@ KateBuildView::KateBuildView(KTextEditor::Plugin *plugin, KTextEditor::MainWindo
     connect(m_buildUi.buildAgainButton2, SIGNAL(clicked()), this, SLOT(slotBuildPreviousTarget()));
     connect(m_buildUi.cancelBuildButton2, SIGNAL(clicked()), this, SLOT(slotStop()));
 
-    connect(m_targetsUi->newTarget, SIGNAL(clicked()), this, SLOT(targetSetNew()));
-    connect(m_targetsUi->copyTarget, SIGNAL(clicked()), this, SLOT(targetOrSetCopy()));
-    connect(m_targetsUi->deleteTarget, SIGNAL(clicked()), this, SLOT(targetDelete()));
-
-    connect(m_targetsUi->addButton, SIGNAL(clicked()), this, SLOT(slotAddTargetClicked()));
     connect(m_targetsUi->buildButton, SIGNAL(clicked()), this, SLOT(slotBuildActiveTarget()));
     connect(m_targetsUi, SIGNAL(enterPressed()), this, SLOT(slotBuildActiveTarget()));
 
@@ -220,9 +208,9 @@ void KateBuildView::readSessionConfig(const KConfigGroup& cg)
     if (numTargets == 0 ) {
         // either the config is empty or uses the older format
         m_targetsUi->targetsModel.addTargetSet(i18n("Target Set"), QString());
-        m_targetsUi->targetsModel.addCommand(0, i18n("build"), cg.readEntry(QStringLiteral("Make Command"), DefBuildCmd));
-        m_targetsUi->targetsModel.addCommand(0, i18n("clean"), cg.readEntry(QStringLiteral("Clean Command"), DefCleanCmd));
-        m_targetsUi->targetsModel.addCommand(0, i18n("config"), DefConfigCmd);
+        m_targetsUi->targetsModel.addCommand(0, i18n("build"), cg.readEntry(QStringLiteral("Make Command"), TargetModel::DefBuildCmd));
+        m_targetsUi->targetsModel.addCommand(0, i18n("clean"), cg.readEntry(QStringLiteral("Clean Command"), TargetModel::DefCleanCmd));
+        m_targetsUi->targetsModel.addCommand(0, i18n("config"), TargetModel::DefConfigCmd);
 
         QString quickCmd = cg.readEntry(QStringLiteral("Quick Compile Command"));
         if (!quickCmd.isEmpty()) {
@@ -241,8 +229,8 @@ void KateBuildView::readSessionConfig(const KConfigGroup& cg)
 
             if (targetNames.isEmpty()) {
                 QString quickCmd = cg.readEntry(QStringLiteral("%1 QuickCmd").arg(i));
-                m_targetsUi->targetsModel.addCommand(i, i18n("build"), cg.readEntry(QStringLiteral("%1 BuildCmd"), DefBuildCmd));
-                m_targetsUi->targetsModel.addCommand(i, i18n("clean"), cg.readEntry(QStringLiteral("%1 CleanCmd"), DefCleanCmd));
+                m_targetsUi->targetsModel.addCommand(i, i18n("build"), cg.readEntry(QStringLiteral("%1 BuildCmd"), TargetModel::DefBuildCmd));
+                m_targetsUi->targetsModel.addCommand(i, i18n("clean"), cg.readEntry(QStringLiteral("%1 CleanCmd"), TargetModel::DefCleanCmd));
                 if (!quickCmd.isEmpty()) {
                     m_targetsUi->targetsModel.addCommand(i, i18n("quick"), quickCmd);
                 }
@@ -251,7 +239,7 @@ void KateBuildView::readSessionConfig(const KConfigGroup& cg)
             else {
                 for (int tn=0; tn<targetNames.size(); ++tn) {
                     const QString targetName = targetNames.at(tn);
-                    m_targetsUi->targetsModel.addCommand(i, targetName, cg.readEntry(QStringLiteral("%1 BuildCmd %2").arg(i).arg(targetName), DefBuildCmd));
+                    m_targetsUi->targetsModel.addCommand(i, targetName, cg.readEntry(QStringLiteral("%1 BuildCmd %2").arg(i).arg(targetName), TargetModel::DefBuildCmd));
                 }
                 QString defCmd = cg.readEntry(QStringLiteral("%1 Target Default").arg(i), QString());
                 m_targetsUi->targetsModel.setDefaultCmd(i, defCmd);
@@ -835,53 +823,6 @@ void KateBuildView::processLine(const QString &line)
 
     // Now we have the data we need show the error/warning
     addError(filename, line_n, QString(), msg);
-}
-
-
-/******************************************************************/
-void KateBuildView::slotAddTargetClicked()
-{
-    QModelIndex current = m_targetsUi->targetsView->currentIndex();
-    if (current.parent().isValid()) {
-        current = current.parent();
-    }
-    QModelIndex index = m_targetsUi->targetsModel.addCommand(current.row(), DefTargetName, DefBuildCmd);
-    m_targetsUi->targetsView->setCurrentIndex(index);
-}
-
-
-/******************************************************************/
-void KateBuildView::targetSetNew()
-{
-    int row = m_targetsUi->targetsModel.addTargetSet(i18n("Target Set"), QString());
-    QModelIndex buildIndex = m_targetsUi->targetsModel.addCommand(row, i18n("Build"), DefBuildCmd);
-    m_targetsUi->targetsModel.addCommand(row, i18n("Clean"), DefCleanCmd);
-    m_targetsUi->targetsModel.addCommand(row, i18n("Config"), DefConfigCmd);
-    m_targetsUi->targetsModel.addCommand(row, i18n("ConfigClean"), DefConfClean);
-    m_targetsUi->targetsView->setCurrentIndex(buildIndex);
-}
-
-/******************************************************************/
-void KateBuildView::targetOrSetCopy()
-{
-    QModelIndex newIndex = m_targetsUi->targetsModel.copyTargetOrSet(m_targetsUi->targetsView->currentIndex());
-    if (m_targetsUi->targetsModel.hasChildren(newIndex)) {
-        m_targetsUi->targetsView->setCurrentIndex(newIndex.child(0,0));
-        return;
-    }
-    m_targetsUi->targetsView->setCurrentIndex(newIndex);
-}
-
-
-/******************************************************************/
-void KateBuildView::targetDelete()
-{
-    QModelIndex current = m_targetsUi->targetsView->currentIndex();
-    m_targetsUi->targetsModel.deleteItem(current);
-
-    if (m_targetsUi->targetsModel.rowCount() == 0) {
-        targetSetNew();
-    }
 }
 
 

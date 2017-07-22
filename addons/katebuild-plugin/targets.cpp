@@ -41,6 +41,11 @@ QWidget(parent)
     //connect(targetsView, SIGNAL(clicked(QModelIndex)), this, SLOT(targetActivated(QModelIndex)));
 
     targetsView->installEventFilter(this);
+
+    connect(addButton, SIGNAL(clicked()), this, SLOT(slotAddTargetClicked()));
+    connect(newTarget, SIGNAL(clicked()), this, SLOT(targetSetNew()));
+    connect(copyTarget, SIGNAL(clicked()), this, SLOT(targetOrSetCopy()));
+    connect(deleteTarget, SIGNAL(clicked()), this, SLOT(targetDelete()));
 }
 
 void TargetsUi::targetSetSelected(int index)
@@ -79,4 +84,44 @@ bool TargetsUi::eventFilter(QObject *obj, QEvent *event)
         }
     }
     return QWidget::eventFilter(obj, event);
+}
+
+void TargetsUi::slotAddTargetClicked()
+{
+    QModelIndex current = targetsView->currentIndex();
+    if (current.parent().isValid()) {
+        current = current.parent();
+    }
+    QModelIndex index = targetsModel.addCommand(current.row(), TargetModel::DefTargetName, TargetModel::DefBuildCmd);
+    targetsView->setCurrentIndex(index);
+}
+
+void TargetsUi::targetSetNew()
+{
+    int row = targetsModel.addTargetSet(i18n("Target Set"), QString());
+    QModelIndex buildIndex = targetsModel.addCommand(row, i18n("Build"), TargetModel::DefBuildCmd);
+    targetsModel.addCommand(row, i18n("Clean"), TargetModel::DefCleanCmd);
+    targetsModel.addCommand(row, i18n("Config"), TargetModel::DefConfigCmd);
+    targetsModel.addCommand(row, i18n("ConfigClean"), TargetModel::DefConfClean);
+    targetsView->setCurrentIndex(buildIndex);
+}
+
+void TargetsUi::targetOrSetCopy()
+{
+    QModelIndex newIndex = targetsModel.copyTargetOrSet(targetsView->currentIndex());
+    if (targetsModel.hasChildren(newIndex)) {
+        targetsView->setCurrentIndex(newIndex.child(0,0));
+        return;
+    }
+    targetsView->setCurrentIndex(newIndex);
+}
+
+void TargetsUi::targetDelete()
+{
+    QModelIndex current = targetsView->currentIndex();
+    targetsModel.deleteItem(current);
+
+    if (targetsModel.rowCount() == 0) {
+        targetSetNew();
+    }
 }

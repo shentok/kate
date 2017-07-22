@@ -43,6 +43,12 @@ public:
     /** This function sets the default command for a target set */
     void setDefaultCmd(int rootRow, const QString &defCmd);
 
+    static const QString DefConfigCmd;
+    static const QString DefConfClean;
+    static const QString DefTargetName;
+    static const QString DefBuildCmd;
+    static const QString DefCleanCmd;
+
 public Q_SLOTS:
 
     /** This function clears all the target-sets */

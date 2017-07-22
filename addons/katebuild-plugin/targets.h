@@ -45,6 +45,13 @@ public Q_SLOTS:
     void targetSetSelected(int index);
     void targetActivated(const QModelIndex &index);
 
+private Q_SLOTS:
+    void slotAddTargetClicked();
+
+    void targetSetNew();
+    void targetOrSetCopy();
+    void targetDelete();
+
 Q_SIGNALS:
     void enterPressed();
 

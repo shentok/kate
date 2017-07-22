@@ -98,12 +98,6 @@ class KateBuildView : public QObject, public KXMLGUIClient, public KTextEditor::
         void slotErrorSelected(QTreeWidgetItem *item);
 
         // Settings
-        void targetSetNew();
-        void targetOrSetCopy();
-        void targetDelete();
-
-        void slotAddTargetClicked();
-
         void slotDisplayMode(int mode);
 
         void handleEsc(QEvent *e);
