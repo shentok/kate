@@ -45,8 +45,6 @@
 #include "TargetModel.h"
 #include "targets.h"
 
-class QTreeWidgetItem;
-
 /******************************************************************/
 class KateBuildView : public QObject, public KXMLGUIClient, public KTextEditor::SessionConfigInterface
 {
@@ -55,6 +53,19 @@ class KateBuildView : public QObject, public KXMLGUIClient, public KTextEditor::
     Q_PROPERTY(QUrl docUrl READ docUrl)
 
     public:
+
+        enum ResultDetails {
+            FullOutput,
+            ParsedOutput,
+            ErrorsAndWarnings,
+            OnlyErrors
+        };
+
+        enum TreeWidgetRoles {
+            IsErrorRole = Qt::UserRole+1,
+            IsWarningRole
+        };
+
        KateBuildView(KTextEditor::Plugin *plugin, KTextEditor::MainWindow *mw);
         ~KateBuildView();
 
@@ -86,6 +97,9 @@ class KateBuildView : public QObject, public KXMLGUIClient, public KTextEditor::
         void slotNext();
         void slotPrev();
         void slotErrorSelected(QTreeWidgetItem *item);
+
+        // Settings
+        void slotDisplayMode(int mode);
 
         void handleEsc(QEvent *e);
 
