@@ -524,11 +524,11 @@ ProxyModel::FilterProxyModel::FilterProxyModel(QObject *parent) :
 
 bool ProxyModel::FilterProxyModel::filterAcceptsRow(int source_row, const QModelIndex &source_parent) const
 {
-    Q_UNUSED(source_row)
-
     if (!source_parent.isValid()) {
+        qDebug() << "ignoring" << source_row << sourceModel()->data(sourceModel()->index(source_row, 0, source_parent));
         return false;
     }
 
+    qDebug() << "letting through" << source_row << sourceModel()->data(sourceModel()->index(source_row, 0, source_parent));
     return true;
 }

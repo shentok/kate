@@ -232,6 +232,8 @@ void KateBuildView::readSessionConfig(const KConfigGroup& cg)
         tmpCmd = cg.readEntry(QStringLiteral("Active Target Command"), 0);
     }
 
+    qDebug() << "target model has entries:" << m_targetsModel.rowCount(QModelIndex());
+    qDebug() << "proxy model has entries:" << m_proxyModel.rowCount(QModelIndex());
 #if 0
     m_targetsUi->targetsView->expandAll();
     m_targetsUi->targetsView->resizeColumnToContents(0);
