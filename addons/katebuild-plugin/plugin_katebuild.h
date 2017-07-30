@@ -25,7 +25,7 @@
 ** MA 02110-1301, USA.
 */
 
-#include <QRegExp>
+#include <QRegularExpression>
 #include <QString>
 #include <QStack>
 #include <QPointer>
@@ -138,10 +138,10 @@ class KateBuildView : public QObject, public KXMLGUIClient, public KTextEditor::
         int               m_displayModeBeforeBuild;
         QString           m_make_dir;
         QStack<QString>   m_make_dir_stack;
-        QRegExp           m_filenameDetector;
-        QRegExp           m_filenameDetectorIcpc;
+        const QRegularExpression m_filenameDetector;
+        const QRegularExpression m_filenameDetectorIcpc;
         bool              m_filenameDetectorGccWorked;
-        QRegExp           m_newDirDetector;
+        const QRegularExpression m_newDirDetector;
         unsigned int      m_numErrors;
         unsigned int      m_numWarnings;
         QString           m_prevItemContent;
