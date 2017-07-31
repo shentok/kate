@@ -77,6 +77,8 @@ KateBuildView::KateBuildView(KTextEditor::Plugin *plugin, KTextEditor::MainWindo
     , m_buildWidget(0)
     , m_outputWidgetWidth(0)
     , m_proc(this)
+    , m_stdOut()
+    , m_stdErr()
     , m_buildCancelled(false)
     , m_displayModeBeforeBuild(1)
     // NOTE this will not allow spaces in file names.
@@ -463,7 +465,8 @@ void KateBuildView::clearBuildResults()
 {
     m_buildUi.plainTextEdit->clear();
     m_buildUi.errTreeWidget->clear();
-    m_output_lines.clear();
+    m_stdOut.clear();
+    m_stdErr.clear();
     m_numErrors = 0;
     m_numWarnings = 0;
     m_make_dir_stack.clear();
@@ -697,27 +700,22 @@ void KateBuildView::slotReadReadyStdOut()
     // FIXME This works for utf8 but not for all charsets
     QString l = QString::fromUtf8(m_proc.readAllStandardOutput());
     l.remove(QLatin1Char('\r'));
-    m_output_lines += l;
-
-    QString tmp;
-
-    int end=0;
-
+    m_stdOut += l;
 
     // handle one line at a time
     do {
-        end = m_output_lines.indexOf(QLatin1Char('\n'));
+        int end = m_stdOut.indexOf(QLatin1Char('\n'));
         if (end < 0) break;
         end++;
-        tmp = m_output_lines.mid(0, end);
-        tmp.remove(QLatin1Char('\n'));
-        m_buildUi.plainTextEdit->appendPlainText(tmp);
-        //qDebug() << tmp;
-        if (tmp.indexOf(m_newDirDetector) >=0) {
+        QString line = m_stdOut.mid(0, end);
+        line.remove(QLatin1Char('\n'));
+        m_buildUi.plainTextEdit->appendPlainText(line);
+        //qDebug() << line;
+        if (line.indexOf(m_newDirDetector) >=0) {
             //qDebug() << "Enter/Exit dir found";
-            int open = tmp.indexOf(QLatin1Char('`'));
-            int close = tmp.indexOf(QLatin1Char('\''));
-            QString newDir = tmp.mid(open+1, close-open-1);
+            int open = line.indexOf(QLatin1Char('`'));
+            int close = line.indexOf(QLatin1Char('\''));
+            QString newDir = line.mid(open+1, close-open-1);
             //qDebug () << "New dir = " << newDir;
 
             if ((m_make_dir_stack.size() > 1) && (m_make_dir_stack.top() == newDir)) {
@@ -731,11 +729,8 @@ void KateBuildView::slotReadReadyStdOut()
             m_make_dir = newDir;
         }
 
-
-        m_output_lines.remove(0,end);
-
+        m_stdOut.remove(0,end);
     } while (1);
-
 }
 
 /******************************************************************/
@@ -744,26 +739,20 @@ void KateBuildView::slotReadReadyStdErr()
     // FIXME This works for utf8 but not for all charsets
     QString l = QString::fromUtf8(m_proc.readAllStandardError());
     l.remove(QLatin1Char('\r'));
-    m_output_lines += l;
-
-    QString tmp;
-
-    int end=0;
+    m_stdErr += l;
 
     do {
-        end = m_output_lines.indexOf(QLatin1Char('\n'));
+        int end = m_stdErr.indexOf(QLatin1Char('\n'));
         if (end < 0) break;
         end++;
-        tmp = m_output_lines.mid(0, end);
-        tmp.remove(QLatin1Char('\n'));
-        m_buildUi.plainTextEdit->appendPlainText(tmp);
+        QString line = m_stdErr.mid(0, end);
+        line.remove(QLatin1Char('\n'));
+        m_buildUi.plainTextEdit->appendPlainText(line);
 
-        processLine(tmp);
+        processLine(line);
 
-        m_output_lines.remove(0,end);
-
+        m_stdErr.remove(0,end);
     } while (1);
-
 }
 
 /******************************************************************/
