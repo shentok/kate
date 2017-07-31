@@ -65,6 +65,7 @@ class KateBuildView : public QObject, public KXMLGUIClient, public KTextEditor::
         };
 
         enum ErrorCategory {
+            CategoryNone,
             CategoryInfo,
             CategoryWarning,
             CategoryError
@@ -149,6 +150,7 @@ class KateBuildView : public QObject, public KXMLGUIClient, public KTextEditor::
         QStack<QString>   m_make_dir_stack;
         QRegularExpression m_filenameDetector;
         QRegularExpression m_filenameDetectorIcpc;
+        QRegularExpression m_filenameDetectorRust;
         QRegularExpression m_newDirDetector;
         unsigned int      m_numErrors;
         unsigned int      m_numWarnings;

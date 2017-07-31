@@ -93,6 +93,7 @@ KateBuildView::KateBuildView(KTextEditor::Plugin *plugin, KTextEditor::MainWindo
     , m_filenameDetector(QStringLiteral("(([a-np-zA-Z]:[\\\\/])?[a-zA-Z0-9_\\.\\-/\\\\]+\\.[a-zA-Z0-9]+):([0-9]+)(.*)"))
     // e.g. from icpc: "main.cpp(14): error: no suitable conversion function from "std::string" to "int" exists"
     , m_filenameDetectorIcpc(QStringLiteral("(([a-np-zA-Z]:[\\\\/])?[a-zA-Z0-9_\\.\\-/\\\\]+\\.[a-zA-Z0-9]+)\\(([0-9]+)\\)(:.*)"))
+    , m_filenameDetectorRust(QStringLiteral("\"level\":\"help\",\".*message\":\"(.*?)\".*\"level\":\"error\",\".*message\":\"(.*?)\".*\"column_start\":(\\d+),.*\"line_start\":(\\d+),.*\"src_path\":\"(.*?)\""))
     , m_newDirDetector(QStringLiteral("make\\[.+\\]: .+ `.*'"))
 {
     KXMLGUIClient::setComponentName (QLatin1String("katebuild"), i18n ("Kate Build Plugin"));
@@ -702,6 +703,9 @@ void KateBuildView::slotReadReadyStdOut()
 
         const QString line = m_stdOut.mid(0, end);
         m_buildUi.plainTextEdit->appendPlainText(line);
+
+        processLine(line);
+
         //qDebug() << line;
 
         if (m_newDirDetector.match(line).hasMatch()) {
@@ -766,49 +770,74 @@ void KateBuildView::processLine(const QString &line)
         match = m_filenameDetectorIcpc.match(line);
     }
 
-    if (!match.hasMatch())
+    if (match.hasMatch())
     {
-        addError(QString(), QStringLiteral("0"), QString(), line, CategoryInfo);
-        //kDebug() << "A filename was not found in the line ";
+        QString filename = match.captured(1);
+        const QString line_n = match.captured(3);
+        const QString msg = match.captured(4);
+
+        //qDebug() << "File Name:"<<filename<< " msg:"<< msg;
+        //add path to file
+        if (QFile::exists(m_make_dir + QLatin1Char('/') + filename)) {
+            filename = m_make_dir + QLatin1Char('/') + filename;
+        }
+
+        // get canonical path, if possible, to avoid duplicated opened files
+        auto canonicalFilePath(QFileInfo(filename).canonicalFilePath());
+        if (!canonicalFilePath.isEmpty()) {
+            filename = canonicalFilePath;
+        }
+
+        ErrorCategory errorCategory = CategoryInfo;
+
+        // The strings are twice in case kate is translated but not make.
+        if (msg.contains(QStringLiteral("error")) ||
+            msg.contains(i18nc("The same word as 'make' uses to mark an error.","error")) ||
+            msg.contains(QStringLiteral("undefined reference")) ||
+            msg.contains(i18nc("The same word as 'ld' uses to mark an ...","undefined reference"))
+           )
+        {
+            errorCategory = CategoryError;
+        }
+        else if (msg.contains(QStringLiteral("warning")) ||
+            msg.contains(i18nc("The same word as 'make' uses to mark a warning.","warning"))
+           )
+        {
+            errorCategory = CategoryWarning;
+        }
+
+        // Now we have the data we need show the error/warning
+        addError(filename, line_n, QStringLiteral("1"), msg, errorCategory);
+
         return;
     }
 
-    QString filename = match.captured(1);
-    const QString line_n = match.captured(3);
-    const QString msg = match.captured(4);
-
-    //qDebug() << "File Name:"<<filename<< " msg:"<< msg;
-    //add path to file
-    if (QFile::exists(m_make_dir + QLatin1Char('/') + filename)) {
-        filename = m_make_dir + QLatin1Char('/') + filename;
-    }
-
-    // get canonical path, if possible, to avoid duplicated opened files
-    auto canonicalFilePath(QFileInfo(filename).canonicalFilePath());
-    if (!canonicalFilePath.isEmpty()) {
-        filename = canonicalFilePath;
-    }
-
-    ErrorCategory errorCategory = CategoryInfo;
-
-    // The strings are twice in case kate is translated but not make.
-    if (line.contains(QStringLiteral("error")) ||
-        line.contains(i18nc("The same word as 'make' uses to mark an error.","error")) ||
-        line.contains(QStringLiteral("undefined reference")) ||
-        line.contains(i18nc("The same word as 'ld' uses to mark an ...","undefined reference"))
-       )
+    if (!match.hasMatch())
     {
-        errorCategory = CategoryError;
-    }
-    else if (line.contains(QStringLiteral("warning")) ||
-        line.contains(i18nc("The same word as 'make' uses to mark a warning.","warning"))
-       )
-    {
-        errorCategory = CategoryWarning;
+        match = m_filenameDetectorRust.match(line);
     }
 
-    // Now we have the data we need show the error/warning
-    addError(filename, line_n, QStringLiteral("1"), msg, errorCategory);
+    if (match.hasMatch())
+    {
+        const QString helpMessage = match.captured(1);
+        const QString errorMessage = match.captured(2);
+        const QString column_n = match.captured(3);
+        const QString line_n = match.captured(4);
+        const QString filename = match.captured(5);
+
+        qDebug() << "found a rust match:" << line;
+        for (int i = 0; i < match.capturedTexts().size(); ++i) {
+            qDebug() << i << ": " << match.capturedTexts().at(i);
+        }
+
+        addError(filename, line_n, column_n, errorMessage, CategoryError);
+        addError(filename, line_n, column_n, helpMessage, CategoryInfo);
+
+        return;
+    }
+
+    addError(QString(), QStringLiteral("0"), QString(), line, CategoryNone);
+    //kDebug() << "A filename was not found in the line ";
 }
 
 
@@ -896,6 +925,9 @@ void KateBuildView::slotDisplayMode(int mode) {
 
         switch (errorCategory)
         {
+        case CategoryNone:
+            item->setHidden(mode > 0);
+            break;
         case CategoryInfo:
             item->setHidden(mode > 1);
             break;
