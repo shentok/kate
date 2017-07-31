@@ -141,6 +141,7 @@ class KateBuildView : public QObject, public KXMLGUIClient, public KTextEditor::
         QStack<QString>   m_make_dir_stack;
         const QRegularExpression m_filenameDetector;
         const QRegularExpression m_filenameDetectorIcpc;
+        const QRegularExpression m_filenameDetectorRust;
         const QRegularExpression m_newDirDetector;
         unsigned int      m_numErrors;
         unsigned int      m_numWarnings;

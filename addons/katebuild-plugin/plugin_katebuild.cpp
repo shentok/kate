@@ -86,6 +86,7 @@ KateBuildView::KateBuildView(KTextEditor::Plugin *plugin, KTextEditor::MainWindo
     , m_filenameDetector(QStringLiteral("(([a-np-zA-Z]:[\\\\/])?[a-zA-Z0-9_\\.\\-/\\\\]+\\.[a-zA-Z0-9]+):([0-9]+)(.*)"))
     // e.g. from icpc: "main.cpp(14): error: no suitable conversion function from "std::string" to "int" exists"
     , m_filenameDetectorIcpc(QStringLiteral("(([a-np-zA-Z]:[\\\\/])?[a-zA-Z0-9_\\.\\-/\\\\]+\\.[a-zA-Z0-9]+)\\(([0-9]+)\\)(:.*)"))
+    , m_filenameDetectorRust(QStringLiteral("\"level\":\"error\",\"(.*)\".*\"line_start\":(\\d+),.*"))
     , m_newDirDetector(QStringLiteral("make\\[.+\\]: .+ `.*'"))
 {
     KXMLGUIClient::setComponentName (QLatin1String("katebuild"), i18n ("Kate Build Plugin"));
@@ -712,6 +713,9 @@ void KateBuildView::slotReadReadyStdOut()
 
         const QString line = m_stdOut.mid(0, end);
         m_buildUi.plainTextEdit->appendPlainText(line);
+
+        processLine(line);
+
         //qDebug() << line;
         if (line.indexOf(m_newDirDetector) >=0) {
             //qDebug() << "Enter/Exit dir found";
@@ -778,31 +782,51 @@ void KateBuildView::processLine(const QString &line)
         match = m_filenameDetectorIcpc.match(line);
     }
 
-    if (!match.hasMatch())
+    if (match.hasMatch())
     {
-        addError(QString(), QStringLiteral("0"), QString(), line);
-        //kDebug() << "A filename was not found in the line ";
+
+        QString filename = match.captured(1);
+        const QString line_n = match.captured(3);
+        const QString msg = match.captured(4);
+
+        //qDebug() << "File Name:"<<filename<< " msg:"<< msg;
+        //add path to file
+        if (QFile::exists(m_make_dir + QLatin1Char('/') + filename)) {
+            filename = m_make_dir + QLatin1Char('/') + filename;
+        }
+
+        // get canonical path, if possible, to avoid duplicated opened files
+        auto canonicalFilePath(QFileInfo(filename).canonicalFilePath());
+        if (!canonicalFilePath.isEmpty()) {
+            filename = canonicalFilePath;
+        }
+
+        // Now we have the data we need show the error/warning
+        addError(filename, line_n, QString(), msg);
+
         return;
     }
 
-    QString filename = match.captured(1);
-    const QString line_n = match.captured(3);
-    const QString msg = match.captured(4);
-
-    //qDebug() << "File Name:"<<filename<< " msg:"<< msg;
-    //add path to file
-    if (QFile::exists(m_make_dir + QLatin1Char('/') + filename)) {
-        filename = m_make_dir + QLatin1Char('/') + filename;
+    if (!match.hasMatch())
+    {
+        match = m_filenameDetectorRust.match(line);
     }
 
-    // get canonical path, if possible, to avoid duplicated opened files
-    auto canonicalFilePath(QFileInfo(filename).canonicalFilePath());
-    if (!canonicalFilePath.isEmpty()) {
-        filename = canonicalFilePath;
+    if (match.hasMatch())
+    {
+        const QString msg = match.captured(0);
+        const QString line_n = match.captured(2);
+        const QString filename = match.captured(3);
+
+        qDebug() << "found a rust match:" << match.capturedTexts()<< line;
+
+        addError(filename, line_n, QString(), match.capturedTexts().join(QStringLiteral(",                             ")));
+
+        addError(QString(), QStringLiteral("0"), QString(), QStringLiteral("matched: ") + line);
     }
 
-    // Now we have the data we need show the error/warning
-    addError(filename, line_n, QString(), msg);
+    addError(QString(), QStringLiteral("0"), QString(), line);
+    //kDebug() << "A filename was not found in the line ";
 }
 
 
