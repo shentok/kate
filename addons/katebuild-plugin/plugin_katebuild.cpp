@@ -704,11 +704,13 @@ void KateBuildView::slotReadReadyStdOut()
 
     // handle one line at a time
     do {
-        int end = m_stdOut.indexOf(QLatin1Char('\n'));
-        if (end < 0) break;
-        end++;
-        QString line = m_stdOut.mid(0, end);
-        line.remove(QLatin1Char('\n'));
+        const int end = m_stdOut.indexOf(QLatin1Char('\n'));
+
+        if (end < 0) {
+            break;
+        }
+
+        const QString line = m_stdOut.mid(0, end);
         m_buildUi.plainTextEdit->appendPlainText(line);
         //qDebug() << line;
         if (line.indexOf(m_newDirDetector) >=0) {
@@ -729,7 +731,7 @@ void KateBuildView::slotReadReadyStdOut()
             m_make_dir = newDir;
         }
 
-        m_stdOut.remove(0,end);
+        m_stdOut.remove(0, end + 1);
     } while (1);
 }
 
@@ -742,16 +744,18 @@ void KateBuildView::slotReadReadyStdErr()
     m_stdErr += l;
 
     do {
-        int end = m_stdErr.indexOf(QLatin1Char('\n'));
-        if (end < 0) break;
-        end++;
-        QString line = m_stdErr.mid(0, end);
-        line.remove(QLatin1Char('\n'));
+        const int end = m_stdErr.indexOf(QLatin1Char('\n'));
+
+        if (end < 0) {
+            break;
+        }
+
+        const QString line = m_stdErr.mid(0, end);
         m_buildUi.plainTextEdit->appendPlainText(line);
 
         processLine(line);
 
-        m_stdErr.remove(0,end);
+        m_stdErr.remove(0, end + 1);
     } while (1);
 }
 
