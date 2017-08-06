@@ -380,28 +380,19 @@ void KateBuildView::slotErrorSelected(QTreeWidgetItem *item)
 
 /******************************************************************/
 void KateBuildView::addError(const QString &filename, const QString &line,
-                             const QString &column, const QString &message)
+                             const QString &column, const QString &message,
+                             ErrorCategory errorCategory)
 {
-    ErrorCategory errorCategory = CategoryInfo;
     QTreeWidgetItem* item = new QTreeWidgetItem(m_buildUi.errTreeWidget);
     item->setBackground(1, Qt::gray);
-    // The strings are twice in case kate is translated but not make.
-    if (message.contains(QStringLiteral("error")) ||
-        message.contains(i18nc("The same word as 'make' uses to mark an error.","error")) ||
-        message.contains(QStringLiteral("undefined reference")) ||
-        message.contains(i18nc("The same word as 'ld' uses to mark an ...","undefined reference"))
-       )
+    if (errorCategory == CategoryError)
     {
-        errorCategory = CategoryError;
         item->setForeground(1, Qt::red);
         m_numErrors++;
         item->setHidden(false);
     }
-    if (message.contains(QStringLiteral("warning")) ||
-        message.contains(i18nc("The same word as 'make' uses to mark a warning.","warning"))
-       )
+    else if (errorCategory == CategoryWarning)
     {
-        errorCategory = CategoryWarning;
         item->setForeground(1, Qt::yellow);
         m_numWarnings++;
         item->setHidden(m_buildUi.displayModeSlider->value() > 2);
@@ -786,7 +777,7 @@ void KateBuildView::processLine(const QString &line)
 
     if (!match.hasMatch())
     {
-        addError(QString(), QStringLiteral("0"), QString(), line);
+        addError(QString(), QStringLiteral("0"), QString(), line, CategoryInfo);
         //kDebug() << "A filename was not found in the line ";
         return;
     }
@@ -807,8 +798,26 @@ void KateBuildView::processLine(const QString &line)
         filename = canonicalFilePath;
     }
 
+    ErrorCategory errorCategory = CategoryInfo;
+
+    // The strings are twice in case kate is translated but not make.
+    if (line.contains(QStringLiteral("error")) ||
+        line.contains(i18nc("The same word as 'make' uses to mark an error.","error")) ||
+        line.contains(QStringLiteral("undefined reference")) ||
+        line.contains(i18nc("The same word as 'ld' uses to mark an ...","undefined reference"))
+       )
+    {
+        errorCategory = CategoryError;
+    }
+    else if (line.contains(QStringLiteral("warning")) ||
+        line.contains(i18nc("The same word as 'make' uses to mark a warning.","warning"))
+       )
+    {
+        errorCategory = CategoryWarning;
+    }
+
     // Now we have the data we need show the error/warning
-    addError(filename, line_n, QStringLiteral("1"), msg);
+    addError(filename, line_n, QStringLiteral("1"), msg, errorCategory);
 }
 
 

@@ -125,7 +125,8 @@ class KateBuildView : public QObject, public KXMLGUIClient, public KTextEditor::
     private:
         void processLine(const QString &);
         void addError(const QString &filename, const QString &line,
-                      const QString &column, const QString &message);
+                      const QString &column, const QString &message,
+                      ErrorCategory errorCategory);
         bool startProcess(const QString &dir, const QString &command);
         bool checkLocal(const QUrl &dir);
         void clearBuildResults();
