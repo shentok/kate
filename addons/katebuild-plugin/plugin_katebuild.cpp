@@ -38,6 +38,9 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QFileDialog>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 #include <QAction>
 
@@ -63,6 +66,44 @@ static const QString DefTargetName = QStringLiteral("all");
 static const QString DefBuildCmd = QStringLiteral("make");
 static const QString DefCleanCmd = QStringLiteral("make clean");
 
+class JsonHelper : public QJsonValue
+{
+public:
+    JsonHelper(const QJsonValue &value = QJsonValue()) :
+        QJsonValue(value)
+    {}
+
+    JsonHelper(const QJsonDocument &document) :
+        QJsonValue(document.isArray()  ? QJsonValue(document.array()) :
+                   document.isObject() ? QJsonValue(document.object()) :
+                                         QJsonValue())
+    {
+    }
+
+    JsonHelper operator[](int i) const
+    {
+        if (isArray()) {
+            const QJsonArray array = toArray();
+            if (0 <= i && i < array.size()) {
+                return JsonHelper(array[i]);
+            }
+        }
+
+        return JsonHelper();
+    }
+
+    JsonHelper operator[](const QString &key) const
+    {
+        if (isObject()) {
+            const QJsonObject object = toObject();
+            if (object.contains(key)) {
+                return JsonHelper(object[key]);
+            }
+        }
+
+        return JsonHelper();
+    }
+};
 
 /******************************************************************/
 KateBuildPlugin::KateBuildPlugin(QObject *parent, const VariantList&):
@@ -93,7 +134,7 @@ KateBuildView::KateBuildView(KTextEditor::Plugin *plugin, KTextEditor::MainWindo
     , m_filenameDetector(QStringLiteral("(([a-np-zA-Z]:[\\\\/])?[a-zA-Z0-9_\\.\\-/\\\\]+\\.[a-zA-Z0-9]+):([0-9]+)(.*)"))
     // e.g. from icpc: "main.cpp(14): error: no suitable conversion function from "std::string" to "int" exists"
     , m_filenameDetectorIcpc(QStringLiteral("(([a-np-zA-Z]:[\\\\/])?[a-zA-Z0-9_\\.\\-/\\\\]+\\.[a-zA-Z0-9]+)\\(([0-9]+)\\)(:.*)"))
-    , m_filenameDetectorRust(QStringLiteral("\"level\":\"help\",\".*message\":\"(.*?)\".*\"level\":\"error\",\".*message\":\"(.*?)\".*\"column_start\":(\\d+),.*\"line_start\":(\\d+),.*\"src_path\":\"(.*?)\""))
+    , m_filenameDetectorRust(QStringLiteral("{\"message\":{.*\"src_path\":\".*\""))
     , m_newDirDetector(QStringLiteral("make\\[.+\\]: .+ `.*'"))
 {
     KXMLGUIClient::setComponentName (QLatin1String("katebuild"), i18n ("Kate Build Plugin"));
@@ -819,19 +860,34 @@ void KateBuildView::processLine(const QString &line)
 
     if (match.hasMatch())
     {
-        const QString helpMessage = match.captured(1);
-        const QString errorMessage = match.captured(2);
-        const QString column_n = match.captured(3);
-        const QString line_n = match.captured(4);
-        const QString filename = match.captured(5);
+        const JsonHelper doc = JsonHelper(QJsonDocument::fromJson(line.toUtf8()));
+        qDebug() << doc;
+        qDebug() << QStringLiteral("/:") << doc.toObject().keys();
+        qDebug() << QStringLiteral("/message:") << doc[QStringLiteral("message")].toObject().keys();
+        qDebug() << QStringLiteral("/message/children:") << doc[QStringLiteral("message")][QStringLiteral("children")].toArray().size();
+        qDebug() << QStringLiteral("/message/children:") << doc[QStringLiteral("message")][QStringLiteral("children")];
+        qDebug() << QStringLiteral("/message/spans:") << doc[QStringLiteral("message")][QStringLiteral("spans")].toArray().size();
+        qDebug() << QStringLiteral("/message/spans:") << doc[QStringLiteral("message")][QStringLiteral("spans")];
+        qDebug() << QStringLiteral("/package_id:") << doc[QStringLiteral("package_id")].toObject().keys();
+        qDebug() << QStringLiteral("/package_id:") << doc[QStringLiteral("package_id")];
+        qDebug() << QStringLiteral("/reason:") << doc[QStringLiteral("reason")].toObject().keys();
+        qDebug() << QStringLiteral("/reason:") << doc[QStringLiteral("reason")];
+        qDebug() << QStringLiteral("/target:") << doc[QStringLiteral("target")].toObject().keys();
+        qDebug() << QStringLiteral("/target:") << doc[QStringLiteral("target")];
 
-        qDebug() << "found a rust match:" << line;
-        for (int i = 0; i < match.capturedTexts().size(); ++i) {
-            qDebug() << i << ": " << match.capturedTexts().at(i);
+        const QString errorMessage = doc[QStringLiteral("message")][QStringLiteral("message")].toString();
+        const QString filename = doc[QStringLiteral("target")][QStringLiteral("src_path")].toString();
+        const int column = doc[QStringLiteral("message")][QStringLiteral("spans")][0][QStringLiteral("column_start")].toInt();
+        const int line_n = doc[QStringLiteral("message")][QStringLiteral("spans")][0][QStringLiteral("line_start")].toInt();
+
+        addError(filename, QString::number(line_n), QString::number(column), errorMessage, CategoryError);
+
+        for (auto entry : doc[QStringLiteral("message")][QStringLiteral("children")].toArray())
+        {
+            const QString helpMessage = JsonHelper(entry)[QStringLiteral("message")].toString();
+
+            addError(filename, QString::number(line_n), QString::number(column), helpMessage, CategoryInfo);
         }
-
-        addError(filename, line_n, column_n, errorMessage, CategoryError);
-        addError(filename, line_n, column_n, helpMessage, CategoryInfo);
 
         return;
     }
