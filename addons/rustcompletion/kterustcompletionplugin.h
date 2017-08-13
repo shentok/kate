@@ -50,8 +50,6 @@ class KTERustCompletionPlugin : public KTextEditor::Plugin
         QUrl rustSrcPath() const;
         void setRustSrcPath(const QUrl &path);
 
-        bool configOk() const;
-
     private Q_SLOTS:
         void updateConfigOk();
 
@@ -64,8 +62,6 @@ class KTERustCompletionPlugin : public KTextEditor::Plugin
         QString m_racerCmd;
         QUrl m_rustSrcPath;
         KDirWatch *m_rustSrcWatch;
-
-        bool m_configOk;
 };
 
 #endif

@@ -33,8 +33,7 @@ K_PLUGIN_FACTORY_WITH_JSON(KTERustCompletionPluginFactory, "kterustcompletionplu
 KTERustCompletionPlugin::KTERustCompletionPlugin(QObject *parent, const QList<QVariant> &)
     : KTextEditor::Plugin(parent),
     m_completion(this),
-    m_rustSrcWatch(0),
-    m_configOk(false)
+    m_rustSrcWatch(0)
 {
     readConfig();
 }
@@ -97,21 +96,12 @@ void KTERustCompletionPlugin::setRustSrcPath(const QUrl &path)
     }
 }
 
-bool KTERustCompletionPlugin::configOk() const
-{
-    return m_configOk;
-}
-
 void KTERustCompletionPlugin::updateConfigOk()
 {
-    m_configOk = false;
-
     if (m_rustSrcPath.isLocalFile()) {
         QString path = m_rustSrcPath.toLocalFile();
 
         if (QDir(path).exists()) {
-            m_configOk = true;
-
             if (m_rustSrcWatch && !m_rustSrcWatch->contains(path)) {
                 delete m_rustSrcWatch;
                 m_rustSrcWatch = nullptr;

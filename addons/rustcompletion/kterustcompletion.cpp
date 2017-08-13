@@ -119,10 +119,6 @@ QList<CompletionMatch> KTERustCompletion::getMatches(const KTextEditor::Document
 {
     QList<CompletionMatch> matches;
 
-    if (!m_plugin->configOk()) {
-        return matches;
-    }
-
     QTemporaryFile file;
 
     if (file.open()) {
